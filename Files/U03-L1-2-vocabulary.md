@@ -1,148 +1,114 @@
-### Group 1
-
+Group 1
 🟢 justice | عدالة
 🟢 crisis | أزمة
-🔴 waste | مخلفات/يضيع
+🔴 empower | يفوض/يعطي سلطة
 🟢 safety | أمان
 🟢 core | أساسي/جوهر
-🔴 remain | يظل/يبقى
-
-### Group 2
-
+🔴 sustainable | مستدام
+Group 2
 🟢 ignore | يتجاهل
 🟢 notice | إشعار/يلاحظ
-🔴 issue | قضية/ينشر
+🔴 campaign | حملة
 🟢 pattern | نمط
 🟢 taxes | ضرائب
-🔴 deadly | مميت
-
-### Group 3
-
+🔴 predict | يتنبأ
+Group 3
 🟢 burden | عبء
 🟢 shared | مشترك
-🔴 campaign | حملة
+🔴 responsibility | مسؤولية
 🟢 majority | أغلبية
 🟢 regions | مناطق
-🔴 predict | يتنبأ
-
-### Group 4
-
+🔴 consequences | عواقب
+Group 4
 🟢 drought | جفاف
+🟢 insight | نظرة متعمقة
+🔴 analyze | يحلل
+🟢 frequent | متكرر
+🟢 solutions | حلول
+🔴 reduction | تقليل
+Group 5
+🟢 rainfall | هطول الأمطار
+🟢 threaten | يهدد
+🔴 optimistic | متفائل
+🟢 efficiency | كفاءة
+🟢 shortage | نقص
+🔴 debate | مناظرة/يجادل
+Group 6
+🟢 unheard | غير مسموع
+🟢 creativity | إبداع
+🔴 temperature | درجة الحرارة
+🟢 unequal | غير متساوي
+🟢 initiative | مبادرة
+🔴 implementation | تنفيذ
+Group 7
+🟢 environmental | بيئي
+🟢 low-income | منخفض الدخل
+🔴 emphasize | يؤكد/يبرز
+🟢 innovator | مبدع
+🟢 hurricane | إعصار
+🔴 sandstorm | عاصفة رملية
+Group 8
+🟢 cooperation | تعاون
+🟢 communities | مجتمعات
+🔴 meteorologist | عالم أرصاد جوية
+🟢 equity | عدالة/إنصاف
+🟢 leadership | قيادة
+🔴 industrialized | صناعي/مصنّع
+Group 9
+🟢 marginalized | مهمش
+🟢 profound | عميق/خطير
+🔴 emissions | انبعاثات
+🟢 tangible | ملموس/محسوس
+🟢 scorching | لاهب/حار جدًا
+🔴 pessimistic | متشائم
+Group 10
+🟢 heatwave | موجة حر شديدة الحرارة
 🟢 call for | يدعو إلى/ينادي بـ
-🔴 result in | يؤدي إلى
+🔴 take action | يتخذ إجراء
+🟢 result in | يؤدي إلى
 🟢 last for | يستمر لـ
-🟢 take action | يتخذ إجراء
 🔴 examples of | أمثلة على
-
-### Group 5
-
+Group 11
 🟢 at its core | في جوهره/في الأساس
-🟢 hopeful about | متفائل بـ
-🔴 responsible for | مسؤول عن
+🟢 responsible for | مسؤول عن
+🔴 hopeful about | متفائل بـ
 🟢 take part in | يشارك في
 🟢 pessimistic about | متشائم بشأن
 🔴 forecast | يتنبأ بالطقس
-
-### Group 6
-
-🟢 insight | نظرة متعمقة
-🟢 analyze | يحلل
-🔴 frequent | متكرر
-🟢 population | تعداد السكان
-🟢 sustainable | مستدام
-🔴 solutions | حلول
-
-### Group 7
-
-🟢 reduction | تقليل
-🟢 rainfall | هطول الأمطار
-🔴 threaten | يهدد
-🟢 efficiency | كفاءة
-🟢 optimistic | متفائل
-🔴 consequences | عواقب
-
-### Group 8
-
-🟢 shortage | نقص
-🟢 debate | مناظرة/يجادل
-🔴 unheard | غير مسموع
-🟢 responsibility | مسؤولية
-🟢 empower | يفوض/يعطي سلطة
-🔴 creativity | إبداع
-
-### Group 9
-
-🟢 unequal | غير متساوي
-🟢 temperature | درجة الحرارة
-🔴 environmental | بيئي
-🟢 fair policies | سياسات عادلة
-🟢 initiative | مبادرة
-🔴 implementation | تنفيذ
-
-### Group 10
-
-🟢 low-income | منخفض الدخل
-🟢 emphasize | يؤكد/يبرز
-🔴 recycling | إعادة التدوير
-🟢 innovator | مبدع
+Group 12
 🟢 carbon footprint | بصمة الكربون
-🔴 weather presenter | مذيع الطقس
-
-### Group 11
-
-🟢 hurricane | إعصار
-🟢 sandstorm | عاصفة رملية
-🔴 dramatically | بشكل درامي
 🟢 global warming | الاحتباس الحراري
+🔴 weather presenter | مذيع الطقس
 🟢 global activism | نشاط عالمي
-🔴 industrialized | صناعي/مصنّع
-
-### Group 12
-
-🟢 meteorologist | عالم أرصاد جوية
-🟢 cooperation | تعاون
-🔴 communities | مجتمعات
-🟢 equity | عدالة/إنصاف
-🟢 leadership | قيادة
-🔴 extreme weather | طقس شديد
-
-### Group 13
-
+🟢 extreme weather | طقس شديد
+🔴 greenhouse gases | غازات دفيئة
+Group 13
+🟢 fair policies | سياسات عادلة
 🟢 solar projects | مشاريع الطاقة الشمسية
-🟢 sunscreen | كريم واقي من الشمس
-🔴 give a voice to | يعطي صوتًا لـ
-🟢 cause the least damage | يتسبب في أقل ضرر
+🔴 sunscreen | كريم واقي من الشمس
+🟢 give a voice to | يعطي صوتًا لـ
 🟢 design programs | يصمم برامج
-🔴 show leadership | يظهر سمات القيادة
-
-### Group 14
-
+🔴 cause the least damage | يتسبب في أقل ضرر
+Group 14
+🟢 show leadership | يظهر سمات القيادة
 🟢 have a debate on | يجري مناقشة
-🟢 take responsibility | يتحمل المسؤولية
-🔴 create a project | يقوم بعمل مشروع
+🔴 take responsibility | يتحمل المسؤولية
+🟢 create a project | يقوم بعمل مشروع
 🟢 waste reduction programs | برامج تقليل المخلفات
-🟢 extreme weather events | أحداث الطقس الشديدة
-🔴 suffer the most | يعاني أكثر
-
-### Group 15
-
-🟢 the five-day forecast | التوقعات لمدة خمسة أيام
-🟢 in the Global South | في نصف الكرة الجنوبي
-🔴 unheard people | أشخاص مهمشون
+🔴 extreme weather events | أحداث الطقس الشديدة
+Group 15
+🟢 suffer the most | يعاني أكثر
+🟢 unheard people | أشخاص مهمشون
+🔴 the five-day forecast | التوقعات لمدة خمسة أيام
 🟢 rising sea levels | ارتفاع مستوى البحر
 🟢 shared decisions | قرارات مشتركة
 🔴 recycling campaigns | حملات إعادة التدوير
-
-### Group 16
-
-🟢 marginalized | مهمش
+Group 16
 🟢 emissions | انبعاثات
-🔴 profound | عميق/خطير
-🟢 tangible | ملموس/محسوس
-🟢 pessimistic | متشائم
-🔴 scorching | لاهب/حار جدًا
-
-### Group 17
-
-🟢 heatwave | موجة حر شديدة الحرارة
-🟢 greenhouse gases | غازات دفيئة
+🟢 recycling | إعادة التدوير
+🔴 dramatically | بشكل درامي
+🟢 waste | مخلفات/يضيع
+🟢 remain | يظل/يبقى
+🔴 marginalized | مهمش
+Group 17
+🟢 shared | مشترك
