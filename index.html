@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E.English</title>
+  <link rel="icon" type="image/png" href="Ui/Logo.png" />
+
+  <link rel="stylesheet" href="CSS/root.css" />
+  <link rel="stylesheet" href="CSS/responsive.css" />
+  <link rel="stylesheet" href="CSS/animations.css" />
+
+  <!-- Iconify: unified icon system for the whole app (replaces raw emoji) -->
+  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <main id="screen-container"></main>
+    <nav id="bottom-nav" class="bottom-nav" hidden>
+      <button class="nav-btn" data-nav="home">
+        <iconify-icon icon="lucide:home" class="icon"></iconify-icon>
+        <span>Home</span>
+      </button>
+      <button class="nav-btn" data-nav="statistics">
+        <iconify-icon icon="lucide:bar-chart-2" class="icon"></iconify-icon>
+        <span>Statistics</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="JavaScript/ux.js"></script>
+  <script src="JavaScript/ui.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      UI.init();
+    });
+  </script>
+</body>
+</html>
