@@ -1,0 +1,106 @@
+/* root.css — Design tokens only. Green + Mint identity, amber for review/
+   highlight, red for hard/wrong, consistent across light & dark mode. */
+
+@font-face {
+  font-family: 'EEnglishFont';
+  src: url('../Ui/Font.ttf') format('truetype');
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+
+  /* ---- Brand: Green + Mint ---- */
+  --color-primary: #1FA971;        /* primary green */
+  --color-primary-dark: #0E5543;   /* deep green — hover/active/text-on-mint */
+  --color-mint: #E6F8F0;           /* light mint background */
+  --color-mint-strong: #C4EEDD;    /* mint border/hover fill */
+  --color-primary-contrast: #ffffff;
+
+  /* ---- Semantic states ---- */
+  --color-success: #1FA971;        /* known / completed / easy */
+  --color-success-bg: #E6F8F0;
+  --color-review: #C98A1B;         /* review / highlight / attention (amber) */
+  --color-review-bg: #FCF1DC;
+  --color-danger: #D94F4F;         /* hard / wrong / error */
+  --color-danger-bg: #FBE9E9;
+
+  /* ---- Neutrals ---- */
+  --color-bg: #F6F8F7;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #F0F3F2;
+  --color-border: #E2E8E5;
+  --color-text: #1B2521;
+  --color-text-muted: #66756F;
+  --color-disabled: #B7C0BC;
+
+  /* ---- Typography ---- */
+  --font-main: 'EEnglishFont', system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 13.5px;
+  --font-size-md: 15.5px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+  --font-size-xxl: 30px;
+  --fw-regular: 400;
+  --fw-medium: 600;
+  --fw-bold: 700;
+
+  /* ---- Spacing ---- */
+  --sp-2xs: 4px;
+  --sp-xs: 8px;
+  --sp-sm: 12px;
+  --sp-md: 16px;
+  --sp-lg: 24px;
+  --sp-xl: 32px;
+
+  /* ---- Radius ---- */
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-pill: 999px;
+
+  /* ---- Shadows (very soft — no heavy glassmorphism) ---- */
+  --shadow-sm: 0 1px 2px rgba(20, 40, 30, 0.05);
+  --shadow-md: 0 4px 14px rgba(20, 40, 30, 0.08);
+
+  /* ---- Layout ---- */
+  --nav-height: 64px;
+  --content-max-width: 720px;
+
+  /* ---- Motion ---- */
+  --t-fast: 0.14s;
+  --t-med: 0.22s;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---- Dark mode: same identity, dark neutrals, kept-consistent semantics ---- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --color-primary: #34C98A;
+    --color-primary-dark: #8FE9C4;
+    --color-mint: #113328;
+    --color-mint-strong: #16493A;
+    --color-primary-contrast: #06140F;
+
+    --color-success: #34C98A;
+    --color-success-bg: #113328;
+    --color-review: #E3A73F;
+    --color-review-bg: #3A2E13;
+    --color-danger: #E37272;
+    --color-danger-bg: #3A1A1A;
+
+    --color-bg: #101512;
+    --color-surface: #171E1A;
+    --color-surface-alt: #1E2622;
+    --color-border: #2A332E;
+    --color-text: #EAF1EC;
+    --color-text-muted: #98A6A0;
+    --color-disabled: #4A544E;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+}

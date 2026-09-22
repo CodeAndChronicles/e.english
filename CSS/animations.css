@@ -1,0 +1,83 @@
+/* animations.css — ALL motion in one place. Kept deliberately subtle:
+   no glassmorphism, no exaggerated bouncing — quick, quiet transitions
+   that make the interface feel responsive without being distracting. */
+
+/* ---------- Skeleton shimmer ---------- */
+@keyframes sk-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.sk {
+  animation: sk-shimmer 1.3s infinite;
+  background-image: linear-gradient(90deg, var(--color-surface-alt) 0%, var(--color-border) 50%, var(--color-surface-alt) 100%);
+  background-size: 200% 100%;
+}
+
+/* ---------- Screen fade-in ---------- */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+#screen-container > * { animation: fade-in-up var(--t-med) var(--ease-out); }
+
+/* ---------- Group expand/collapse ---------- */
+.group-chevron { transition: transform var(--t-fast) var(--ease-out); }
+.group-body {
+  animation: fade-in-up var(--t-fast) var(--ease-out);
+}
+
+/* ---------- Checkbox feedback ---------- */
+@keyframes cb-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.cb-input:checked ~ .cb-box,
+.cb-input:indeterminate ~ .cb-box {
+  animation: cb-pop var(--t-fast) var(--ease-out);
+}
+.cb-box { transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out); }
+
+/* ---------- Highlight flash for deep-link (search / review navigation) ----------
+   Fully self-contained: the amber flash color is inseparable from the
+   animation, so both live here only — nothing split into another file. */
+@keyframes highlight-fade {
+  0%   { background-color: var(--color-review-bg); box-shadow: 0 0 0 3px var(--color-review); }
+  100% { background-color: transparent; box-shadow: 0 0 0 0 transparent; }
+}
+.highlight-flash {
+  animation: highlight-fade 2.2s var(--ease-out) forwards;
+  border-radius: var(--r-sm);
+}
+
+/* ---------- Flag toggle ---------- */
+@keyframes flag-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.flag-btn.active { animation: flag-pop var(--t-fast) var(--ease-out); }
+.flag-btn, .icon-btn, .nav-card, .btn, .nav-btn, .cb-box, .quiz-input, .search-box {
+  transition: background var(--t-fast) var(--ease-out),
+              color var(--t-fast) var(--ease-out),
+              border-color var(--t-fast) var(--ease-out),
+              box-shadow var(--t-fast) var(--ease-out),
+              opacity var(--t-fast) var(--ease-out);
+}
+
+/* ---------- Quiz feedback ---------- */
+@keyframes feedback-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.quiz-feedback { animation: feedback-in var(--t-fast) var(--ease-out); }
+
+/* ---------- Timer low-time pulse ---------- */
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+.quiz-timer.low-time { animation: timer-pulse 1s infinite; }
+
+/* ---------- Progress bar fill ---------- */
+.progress-fill { transition: width var(--t-med) var(--ease-out); }
