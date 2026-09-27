@@ -81,3 +81,18 @@
 
 /* ---------- Progress bar fill ---------- */
 .progress-fill { transition: width var(--t-med) var(--ease-out); }
+.mini-progress-fill { transition: width var(--t-med) var(--ease-out); }
+
+/* ---------- Theme switch: smooth color transition across the whole app,
+   not an instant color-snap, without adding any heavy visual effect ---------- */
+body, .card, .section-card, .nav-card, .group, .word-row, .result-row,
+.bottom-nav, .theme-toggle-btn, .search-box, .quiz-input {
+  transition: background-color var(--t-med) var(--ease-out),
+              color var(--t-med) var(--ease-out),
+              border-color var(--t-med) var(--ease-out);
+}
+@keyframes theme-btn-spin {
+  from { transform: rotate(-25deg); }
+  to   { transform: rotate(0deg); }
+}
+.theme-toggle-btn:active .icon { animation: theme-btn-spin var(--t-fast) var(--ease-out); }
