@@ -37,8 +37,10 @@
     return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
   }
 
-  const el = { screen: null, nav: null };
-  let currentScreen = 'home';
+  const el = { screen: null, nav: null, themeBtn: null };
+  let route = { screen: 'home' };
+  let lessonProgressRef = null; // { unit, lessonKey, fillEl, textEl } — live-updated, not rebuilt
+  let statsRefs = null; // live-updatable stats DOM refs, set by renderStatistics()
 
   function showNav(active) {
     if (!el.nav) return;
@@ -46,6 +48,17 @@
     el.nav.querySelectorAll('.nav-btn').forEach(function (b) {
       b.classList.toggle('active', b.dataset.nav === active);
     });
+  }
+
+  /* ---------------- Theme ---------------- */
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    if (el.themeBtn) {
+      const ic = el.themeBtn.querySelector('iconify-icon');
+      // Icon shows the action available (switch-to), not the current state.
+      if (ic) ic.setAttribute('icon', theme === 'dark' ? 'lucide:sun' : 'lucide:moon');
+      el.themeBtn.setAttribute('aria-label', theme === 'dark' ? 'التبديل للـ Light Mode' : 'التبديل للـ Dark Mode');
+    }
   }
 
   /* Custom checkbox: hidden native input (for real change events + a11y)
@@ -65,11 +78,16 @@
     return label;
   }
 
-  /* ---------------- Section metadata (icons + labels only — presentation) ---------------- */
+  /* ---------------- Section metadata (icons + labels only — presentation) ----------------
+     Dynamic by design: an unknown section type still renders via the
+     fallback in sectionMeta() below, so a new file type (e.g. a future
+     Derivatives-like section) works without a JS change — this map only
+     upgrades the icon/label once someone wants a nicer one. */
   const SECTION_META = {
     vocabulary: { label: 'Vocabulary', icon: 'lucide:book-open', className: 'sec-vocabulary' },
-    idioms: { label: 'Idioms', icon: 'lucide:quote', className: 'sec-idioms' },
-    synonyms_antonyms: { label: 'Synonyms & Antonyms', icon: 'lucide:repeat', className: 'sec-synonyms' }
+    idioms: { label: 'Idioms & Phrasal Verbs', icon: 'lucide:quote', className: 'sec-idioms' },
+    synonyms_antonyms: { label: 'Synonyms & Antonyms', icon: 'lucide:repeat', className: 'sec-synonyms' },
+    derivatives: { label: 'Derivatives', icon: 'lucide:git-branch', className: 'sec-derivatives' }
   };
   function sectionMeta(type) {
     return SECTION_META[type] || { label: type, icon: 'lucide:file-text', className: 'sec-generic' };
@@ -77,7 +95,7 @@
 
   /* ================= Skeleton ================= */
   function renderSkeleton() {
-    currentScreen = 'skeleton';
+    route = { screen: 'skeleton' };
     clear(el.screen);
     if (el.nav) el.nav.hidden = true;
     const wrap = h('div', { class: 'skeleton-wrap' });
@@ -90,7 +108,7 @@
 
   /* ================= Load-blocked (file://) ================= */
   function renderLoadBlocked() {
-    currentScreen = 'load-blocked';
+    route = { screen: 'load-blocked' };
     clear(el.screen);
     if (el.nav) el.nav.hidden = true;
     const wrap = h('div', { class: 'card blocked-card' }, [
@@ -108,7 +126,7 @@
 
   /* ================= Home ================= */
   function renderHome() {
-    currentScreen = 'home';
+    route = { screen: 'home' };
     clear(el.screen);
     const units = UX.getUnits();
 
@@ -169,7 +187,7 @@
 
   /* ================= Unit ================= */
   function renderUnit(unitNum) {
-    currentScreen = 'unit';
+    route = { screen: 'unit', unit: unitNum };
     clear(el.screen);
     const unit = UX.getUnits().find(function (u) { return u.unit === unitNum; });
     if (!unit) { renderHome(); return; }
@@ -197,7 +215,7 @@
 
   /* ================= Lesson ================= */
   function renderLesson(unitNum, lessonKey, opts) {
-    currentScreen = 'lesson';
+    route = { screen: 'lesson', unit: unitNum, lessonKey: lessonKey };
     opts = opts || {};
     clear(el.screen);
     const unit = UX.getUnits().find(function (u) { return u.unit === unitNum; });
@@ -211,22 +229,52 @@
     ]));
 
     const groupOfFocus = opts.focusWordId ? findGroupIndexForWord(lesson, opts.focusWordId) : null;
+    lessonProgressRef = null;
 
     const sectionsWrap = h('div', { class: 'sections-wrap' });
+
+    // Sections whose file failed to load (per app.json) get a visible
+    // warning card instead of silently disappearing.
+    UX.getMissingSections().forEach(function (m) {
+      if (m.unit !== unitNum || m.lessons.join('-') !== lessonKey) return;
+      const meta = sectionMeta(m.type);
+      sectionsWrap.appendChild(h('section', { class: 'section-card section-missing' }, [
+        h('div', { class: 'section-card-head' }, [
+          h('span', { class: 'section-icon-badge section-icon-warning' }, [icon('lucide:alert-triangle')]),
+          h('div', { class: 'section-head-text' }, [
+            h('h2', { class: 'section-title', text: meta.label }),
+            h('span', { class: 'section-count text-warning', text: 'لم يتم تحميل ملف هذا القسم' })
+          ])
+        ])
+      ]));
+    });
+
     lesson.sections.forEach(function (section) {
       const meta = sectionMeta(section.type);
       const wordCount = section.groups.reduce(function (a, g) { return a + g.words.length; }, 0);
 
       const card = h('section', { class: 'section-card ' + meta.className });
+      const headText = h('div', { class: 'section-head-text' }, [
+        h('h2', { class: 'section-title', text: meta.label }),
+        h('span', { class: 'section-count', text: wordCount + ' كلمة' })
+      ]);
       card.appendChild(h('div', { class: 'section-card-head' }, [
         h('span', { class: 'section-icon-badge' }, [icon(meta.icon)]),
-        h('div', { class: 'section-head-text' }, [
-          h('h2', { class: 'section-title', text: meta.label }),
-          h('span', { class: 'section-count', text: wordCount + ' كلمة' })
-        ])
+        headText
       ]));
 
       if (section.type === 'vocabulary') {
+        // Vocabulary-only progress for this lesson (kept separate from
+        // Synonyms/Idioms/Derivatives — see UX.getLessonVocabularyProgress).
+        const vp = UX.getLessonVocabularyProgress(unitNum, lessonKey);
+        const progressWrap = h('div', { class: 'mini-progress' });
+        const progressFill = h('div', { class: 'mini-progress-fill' });
+        progressFill.style.width = Math.round(vp.progress * 100) + '%';
+        progressWrap.appendChild(progressFill);
+        const progressText = h('span', { class: 'mini-progress-text', text: vp.known + '/' + vp.total + ' (' + Math.round(vp.progress * 100) + '%)' });
+        headText.appendChild(h('div', { class: 'mini-progress-row' }, [progressWrap, progressText]));
+        lessonProgressRef = { unit: unitNum, lessonKey: lessonKey, fillEl: progressFill, textEl: progressText };
+
         const canSelected = UX.canStartSelectedQuiz(unitNum, lessonKey);
         const row = h('div', { class: 'quiz-launch-row' });
         row.appendChild(h('button', {
@@ -396,41 +444,25 @@
         countEl.textContent = known + '/' + wordIds.length;
       }
     });
+    refreshLessonProgress();
   }
 
-  /* ================= Statistics ================= */
-  function renderStatistics() {
-    currentScreen = 'statistics';
-    clear(el.screen);
-    const stats = UX.getStatistics();
+  // Vocabulary-only progress bar inside the lesson's Vocabulary section
+  // header — updated in place, never triggers a screen rebuild.
+  function refreshLessonProgress() {
+    if (!lessonProgressRef) return;
+    const vp = UX.getLessonVocabularyProgress(lessonProgressRef.unit, lessonProgressRef.lessonKey);
+    lessonProgressRef.fillEl.style.width = Math.round(vp.progress * 100) + '%';
+    lessonProgressRef.textEl.textContent = vp.known + '/' + vp.total + ' (' + Math.round(vp.progress * 100) + '%)';
+  }
 
-    el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Statistics' })]));
-
-    const progressCard = h('div', { class: 'card' });
-    progressCard.appendChild(h('div', { class: 'stats-row' }, [
-      h('span', { class: 'text-muted', text: 'التقدّم' }),
-      h('span', { class: 'stats-value', text: Math.round(stats.progress * 100) + '%' })
-    ]));
-    const bar = h('div', { class: 'progress-bar' });
-    const fill = h('div', { class: 'progress-fill' });
-    fill.style.width = Math.round(stats.progress * 100) + '%';
-    bar.appendChild(fill);
-    progressCard.appendChild(bar);
-    progressCard.appendChild(h('div', { class: 'stats-row' }, [
-      h('span', { class: 'text-muted', text: 'محفوظ' }),
-      h('span', { class: 'stats-value', text: stats.knownCount + ' / ' + stats.totalWords })
-    ]));
-    el.screen.appendChild(progressCard);
-
-    el.screen.appendChild(h('h2', { class: 'section-title-flat' }, [
-      icon('lucide:flag'), h('span', { text: 'كلمات محتاجة مراجعة (' + stats.reviewWords.length + ')' })
-    ]));
+  function renderReviewInto(container, stats) {
+    clear(container);
     if (!stats.reviewWords.length) {
-      el.screen.appendChild(h('p', { class: 'empty-note', text: 'مفيش حاجة محتاجة مراجعة. تمام كده!' }));
+      container.appendChild(h('p', { class: 'empty-note', text: 'مفيش حاجة محتاجة مراجعة. تمام كده!' }));
     } else {
-      const list = h('div', { class: 'review-list' });
       stats.reviewWords.forEach(function (r) {
-        list.appendChild(h('button', { class: 'result-row review-row', onclick: function () { navigateToWord(r.wordId); } }, [
+        container.appendChild(h('button', { class: 'result-row review-row', onclick: function () { navigateToWord(r.wordId); } }, [
           icon(sectionMeta(r.type).icon, 'result-icon'),
           h('div', { class: 'result-text' }, [
             h('span', { class: 'result-word', text: r.word }),
@@ -439,8 +471,78 @@
           h('span', { class: 'result-loc', text: 'U' + r.unit + ' · L' + r.lessons.join('-') })
         ]));
       });
-      el.screen.appendChild(list);
     }
+  }
+
+  // Statistics screen: patch just the numbers/lists that changed instead
+  // of clearing and rebuilding the whole screen (keeps scroll position).
+  function refreshStatsLive() {
+    if (!statsRefs) return;
+    const stats = UX.getStatistics();
+    statsRefs.vocabFill.style.width = Math.round(stats.vocabulary.progress * 100) + '%';
+    statsRefs.vocabText.textContent = stats.vocabulary.known + ' / ' + stats.vocabulary.total + ' (' + Math.round(stats.vocabulary.progress * 100) + '%)';
+    statsRefs.overallFill.style.width = Math.round(stats.overall.progress * 100) + '%';
+    statsRefs.overallText.textContent = stats.overall.known + ' / ' + stats.overall.total;
+    statsRefs.reviewHead.textContent = 'كلمات محتاجة مراجعة (' + stats.reviewWords.length + ')';
+    renderReviewInto(statsRefs.reviewListEl, stats);
+  }
+
+  /* ================= Statistics ================= */
+  function renderStatistics() {
+    route = { screen: 'statistics' };
+    clear(el.screen);
+    const stats = UX.getStatistics();
+
+    el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Statistics' })]));
+
+    // Vocabulary progress — separate from overall/global study stats so
+    // Synonyms/Idioms/Derivatives never dilute this percentage.
+    const vocabCard = h('div', { class: 'card' });
+    const vocabText = h('span', { class: 'stats-value', text: stats.vocabulary.known + ' / ' + stats.vocabulary.total + ' (' + Math.round(stats.vocabulary.progress * 100) + '%)' });
+    vocabCard.appendChild(h('div', { class: 'stats-row' }, [
+      h('span', { class: 'text-muted', text: 'تقدّم المفردات (Vocabulary)' }),
+      vocabText
+    ]));
+    const vocabBar = h('div', { class: 'progress-bar' });
+    const vocabFill = h('div', { class: 'progress-fill' });
+    vocabFill.style.width = Math.round(stats.vocabulary.progress * 100) + '%';
+    vocabBar.appendChild(vocabFill);
+    vocabCard.appendChild(vocabBar);
+    el.screen.appendChild(vocabCard);
+
+    // Overall/global — every section type combined (used for a general
+    // sense of study activity, intentionally not called "Vocabulary").
+    const overallCard = h('div', { class: 'card' });
+    overallCard.appendChild(h('div', { class: 'stats-row' }, [
+      h('span', { class: 'text-muted', text: 'كل المحتوى (كل الأقسام)' }),
+      h('span', { class: 'stats-value', text: Math.round(stats.overall.progress * 100) + '%' })
+    ]));
+    const overallBar = h('div', { class: 'progress-bar' });
+    const overallFill = h('div', { class: 'progress-fill' });
+    overallFill.style.width = Math.round(stats.overall.progress * 100) + '%';
+    overallBar.appendChild(overallFill);
+    overallCard.appendChild(overallBar);
+    const overallText = h('span', { class: 'stats-value', text: stats.overall.known + ' / ' + stats.overall.total });
+    overallCard.appendChild(h('div', { class: 'stats-row' }, [
+      h('span', { class: 'text-muted', text: 'محفوظ' }),
+      overallText
+    ]));
+    el.screen.appendChild(overallCard);
+
+    const reviewHead = h('h2', { class: 'section-title-flat' }, [
+      icon('lucide:flag'), h('span', { text: 'كلمات محتاجة مراجعة (' + stats.reviewWords.length + ')' })
+    ]);
+    el.screen.appendChild(reviewHead);
+    const reviewListEl = h('div', { class: 'review-list' });
+    renderReviewInto(reviewListEl, stats);
+    el.screen.appendChild(reviewListEl);
+
+    statsRefs = {
+      vocabFill: vocabFill, vocabText: vocabText,
+      overallFill: overallFill, overallText: overallText,
+      reviewHead: reviewHead.querySelector('span:last-child'),
+      reviewListEl: reviewListEl
+    };
 
     el.screen.appendChild(h('h2', { class: 'section-title-flat' }, [icon('lucide:history'), h('span', { text: 'آخر الكويزات' })]));
     if (!stats.recentQuizzes.length) {
@@ -462,7 +564,7 @@
 
   /* ================= Quiz ================= */
   function renderQuiz() {
-    currentScreen = 'quiz';
+    route = { screen: 'quiz' };
     clear(el.screen);
     const quiz = UX.getCurrentQuiz();
     if (!quiz) { renderHome(); return; }
@@ -550,7 +652,7 @@
   }
 
   function renderQuizFinished(summary) {
-    currentScreen = 'quiz-result';
+    route = { screen: 'quiz-result' };
     clear(el.screen);
     el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'نتيجة الكويز' })]));
     const card = h('div', { class: 'card result-card' });
@@ -581,6 +683,7 @@
   function init() {
     el.screen = document.getElementById('screen-container');
     el.nav = document.getElementById('bottom-nav');
+    el.themeBtn = document.getElementById('theme-toggle-btn');
 
     if (el.nav) {
       el.nav.querySelectorAll('.nav-btn').forEach(function (b) {
@@ -591,12 +694,27 @@
       });
     }
 
+    // Theme: applied once at boot, then fully driven by the toggle + the
+    // 'theme-changed' event — never re-derived from the OS after that.
+    applyTheme(UX.getTheme());
+    if (el.themeBtn) {
+      el.themeBtn.addEventListener('click', function () {
+        UX.setTheme(UX.getTheme() === 'dark' ? 'light' : 'dark');
+      });
+    }
+    UX.on('theme-changed', applyTheme);
+
     UX.on('content-ready', renderHome);
     UX.on('content-load-blocked', renderLoadBlocked);
+
+    // Live updates: patch only the DOM affected by this change — never a
+    // full-screen rebuild — so scroll position, open/closed groups, and
+    // input focus are never disturbed by toggling a checkbox.
     UX.on('state-changed', function () {
-      if (currentScreen === 'lesson' || currentScreen === 'unit') refreshWordStates();
-      else if (currentScreen === 'statistics') renderStatistics();
+      if (route.screen === 'lesson') refreshWordStates();
+      else if (route.screen === 'statistics') refreshStatsLive();
     });
+
     UX.on('quiz-tick', updateQuizTimer);
     UX.on('quiz-finished', renderQuizFinished);
     UX.on('search-results', renderSearchResults);

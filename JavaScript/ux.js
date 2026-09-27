@@ -24,7 +24,8 @@
     known: 'eenglish.known',
     manualReview: 'eenglish.manualReview',
     autoReview: 'eenglish.autoReview',
-    quizHistory: 'eenglish.quizHistory'
+    quizHistory: 'eenglish.quizHistory',
+    theme: 'eenglish.theme'
   };
 
   function readLS(key, fallback) {
@@ -50,7 +51,13 @@
     currentScreen: 'home',
     quiz: null,
     searchIndex: [],
-    lastSearchQuery: ''
+    lastSearchQuery: '',
+    // Sections whose file was listed in app.json but failed to load —
+    // kept so the UI can show "this section didn't load" instead of
+    // just silently omitting it (parsed from the filename itself, which
+    // doesn't require the fetch to have succeeded).
+    missingSections: [],
+    theme: readLS(LS_KEYS.theme, null) // null = no explicit user choice yet
   };
 
   /* ---------------- Word ID ---------------- */
@@ -199,6 +206,7 @@
       return Promise.resolve();
     }
 
+    state.missingSections = [];
     return fetch('app.json')
       .then(function (r) {
         if (!r.ok) throw new Error('app.json not found');
@@ -214,7 +222,9 @@
             })
             .catch(function () {
               console.warn('[Warning] Missing content file:\nFiles/' + fname);
-              emit('content-file-missing', { fname: fname });
+              const meta = parseFilename(fname);
+              if (meta) state.missingSections.push({ unit: meta.unit, lessons: meta.lessons, type: meta.type, fname: fname });
+              emit('content-file-missing', { fname: fname, meta: meta });
               return null;
             });
         });
@@ -532,17 +542,26 @@
     return null;
   }
 
-  /* ---------------- Statistics ---------------- */
+  /* ---------------- Statistics ----------------
+     Vocabulary progress is tracked separately from overall/global study
+     stats, so Synonyms/Idioms/Derivatives words never dilute the
+     "Vocabulary" percentage — they're still counted in the overall
+     figure, since known/review state is generic across every section type. */
   function getStatistics() {
-    let totalWords = 0, knownCount = 0;
+    let vocabTotal = 0, vocabKnown = 0;
+    let overallTotal = 0, overallKnown = 0;
     const reviewWords = [];
     state.units.forEach(function (unit) {
       unit.lessons.forEach(function (lesson) {
         lesson.sections.forEach(function (section) {
           section.groups.forEach(function (group, gi) {
             group.words.forEach(function (w) {
-              totalWords++;
-              if (state.known[w.wordId]) knownCount++;
+              overallTotal++;
+              if (state.known[w.wordId]) overallKnown++;
+              if (section.type === 'vocabulary') {
+                vocabTotal++;
+                if (state.known[w.wordId]) vocabKnown++;
+              }
               if (state.manualReview[w.wordId] || state.autoReview[w.wordId]) {
                 reviewWords.push({
                   wordId: w.wordId, word: w.word, meaning: w.meaning,
@@ -557,10 +576,37 @@
     });
     const recent = state.quizHistory.slice(-5).reverse();
     return {
-      totalWords: totalWords, knownCount: knownCount,
-      progress: totalWords > 0 ? knownCount / totalWords : 0,
-      reviewWords: reviewWords, recentQuizzes: recent
+      vocabulary: { total: vocabTotal, known: vocabKnown, progress: vocabTotal > 0 ? vocabKnown / vocabTotal : 0 },
+      overall: { total: overallTotal, known: overallKnown, progress: overallTotal > 0 ? overallKnown / overallTotal : 0 },
+      reviewWords: reviewWords,
+      recentQuizzes: recent
     };
+  }
+
+  // Vocabulary progress scoped to one lesson only (used for the small
+  // progress indicator inside a lesson's Vocabulary section header).
+  function getLessonVocabularyProgress(unitNum, lessonKey) {
+    const words = collectVocabularyFor(unitNum, lessonKey);
+    const known = words.filter(function (w) { return isKnown(w.wordId); }).length;
+    return { total: words.length, known: known, progress: words.length > 0 ? known / words.length : 0 };
+  }
+
+  /* ---------------- Theme ---------------- */
+  function getTheme() {
+    if (state.theme === 'light' || state.theme === 'dark') return state.theme;
+    // No explicit choice yet — fall back to the system preference just as
+    // an initial default; from the first setTheme() call onward this is
+    // fully user-controlled and persisted, never re-derived from the OS.
+    try {
+      if (global.matchMedia && global.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+    } catch (e) {}
+    return 'light';
+  }
+  function setTheme(theme) {
+    if (theme !== 'light' && theme !== 'dark') return;
+    state.theme = theme;
+    writeLS(LS_KEYS.theme, theme);
+    emit('theme-changed', theme);
   }
 
   /* ---------------- Public API ---------------- */
@@ -569,6 +615,9 @@
     loadAll: loadAll,
     getUnits: function () { return state.units; },
     getStatistics: getStatistics,
+    getLessonVocabularyProgress: getLessonVocabularyProgress,
+    getMissingSections: function () { return state.missingSections.slice(); },
+    getTheme: getTheme, setTheme: setTheme,
     getQuizHistory: function () { return state.quizHistory.slice(); },
     isKnown: isKnown, isManualReview: isManualReview, isAutoReview: isAutoReview, needsReview: needsReview,
     toggleKnown: toggleKnown, toggleManualReview: toggleManualReview,
