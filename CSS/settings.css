@@ -1,0 +1,95 @@
+/* settings.css — Settings screen only (theme picker, keep-awake, data
+   actions) + the toast used to confirm export/import/delete. Kept in its
+   own file since Settings is a new, self-contained feature area — see
+   JavaScript/settings.js for the matching markup. */
+
+.settings-card {
+  display: flex; flex-direction: column;
+  padding: var(--sp-xs) var(--sp-lg);
+  margin-bottom: var(--sp-lg);
+}
+.settings-row {
+  display: flex; align-items: center; gap: var(--sp-md);
+  padding: var(--sp-md) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-row-block { flex-wrap: wrap; }
+.settings-row-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: var(--r-md);
+  background: var(--color-mint); color: var(--color-primary); flex-shrink: 0;
+}
+.settings-row-text { flex: 1; min-width: 0; }
+.settings-row-title { font-weight: var(--fw-medium); }
+.settings-row-sub { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px; }
+
+/* ---- Light/Dark segmented control ---- */
+.segmented {
+  display: inline-flex; background: var(--color-surface-alt);
+  border-radius: var(--r-pill); padding: 3px; flex-shrink: 0;
+}
+.segmented-btn {
+  padding: var(--sp-xs) var(--sp-md); border-radius: var(--r-pill);
+  font-size: var(--font-size-sm); font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+}
+.segmented-btn.active { background: var(--color-primary); color: var(--color-primary-contrast); }
+
+/* ---- Theme color grid ---- */
+.theme-color-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-sm); width: 100%; padding-bottom: var(--sp-md);
+}
+.theme-color-swatch {
+  display: flex; align-items: center; gap: var(--sp-xs);
+  padding: var(--sp-sm) var(--sp-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--r-md);
+  background: var(--color-surface);
+}
+.theme-color-swatch.active { border-color: var(--color-primary); background: var(--color-mint); }
+.swatch-dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); }
+.swatch-green { background: #1FA971; }
+.swatch-blue { background: #2F5FA8; }
+.swatch-gray { background: #55606B; }
+.swatch-red { background: #B23A48; }
+.swatch-label { font-size: var(--font-size-sm); }
+
+/* ---- Toggle switch (keep screen awake) ---- */
+.switch { position: relative; display: inline-block; width: 46px; height: 27px; flex-shrink: 0; cursor: pointer; }
+.switch-track {
+  position: absolute; inset: 0; border-radius: var(--r-pill);
+  background: var(--color-disabled);
+}
+.switch-track::after {
+  content: ''; position: absolute; top: 3px; right: 3px;
+  width: 21px; height: 21px; border-radius: 50%; background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--t-fast) var(--ease-out);
+}
+.switch-input:checked ~ .switch-track { background: var(--color-primary); }
+.switch-input:checked ~ .switch-track::after { transform: translateX(-19px); }
+
+/* ---- Data action buttons ---- */
+.settings-action-btn { width: 100%; margin: var(--sp-xs) 0; justify-content: flex-start; }
+.settings-action-btn:first-of-type { margin-top: var(--sp-md); }
+.settings-action-btn:last-of-type { margin-bottom: var(--sp-md); }
+
+/* ---- Toast ---- */
+.settings-toast {
+  position: fixed; bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--sp-md));
+  left: 50%; transform: translate(-50%, 12px);
+  background: var(--color-text); color: var(--color-bg);
+  padding: var(--sp-sm) var(--sp-lg); border-radius: var(--r-pill);
+  font-size: var(--font-size-sm); font-weight: var(--fw-medium);
+  box-shadow: var(--shadow-md);
+  opacity: 0; transition: opacity var(--t-med) var(--ease-out), transform var(--t-med) var(--ease-out);
+  z-index: 300; max-width: calc(100% - var(--sp-lg) * 2); text-align: center;
+}
+.settings-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.settings-toast-warn { background: var(--color-review); color: #1B2521; }
+
+@media (min-width: 480px) {
+  .theme-color-grid { grid-template-columns: repeat(4, 1fr); }
+}

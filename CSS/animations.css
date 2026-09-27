@@ -57,13 +57,15 @@
   100% { transform: scale(1); }
 }
 .flag-btn.active { animation: flag-pop var(--t-fast) var(--ease-out); }
-.flag-btn, .icon-btn, .nav-card, .btn, .nav-btn, .cb-box, .quiz-input, .search-box {
+.flag-btn, .icon-btn, .nav-card, .btn, .nav-btn, .cb-box, .quiz-input, .search-box,
+.quiz-history-item, .theme-color-swatch, .switch-track, .segmented-btn {
   transition: background var(--t-fast) var(--ease-out),
               color var(--t-fast) var(--ease-out),
               border-color var(--t-fast) var(--ease-out),
               box-shadow var(--t-fast) var(--ease-out),
               opacity var(--t-fast) var(--ease-out);
 }
+.quiz-pulse::after { transition: background var(--t-fast) var(--ease-out); }
 
 /* ---------- Quiz feedback ---------- */
 @keyframes feedback-in {
@@ -86,7 +88,8 @@
 /* ---------- Theme switch: smooth color transition across the whole app,
    not an instant color-snap, without adding any heavy visual effect ---------- */
 body, .card, .section-card, .nav-card, .group, .word-row, .result-row,
-.bottom-nav, .theme-toggle-btn, .search-box, .quiz-input {
+.bottom-nav, .theme-toggle-btn, .search-box, .quiz-input,
+.settings-card, .settings-row, .quiz-history-item, .theme-color-swatch, .switch-track {
   transition: background-color var(--t-med) var(--ease-out),
               color var(--t-med) var(--ease-out),
               border-color var(--t-med) var(--ease-out);
