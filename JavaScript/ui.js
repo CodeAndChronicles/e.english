@@ -60,6 +60,12 @@
       el.themeBtn.setAttribute('aria-label', theme === 'dark' ? 'التبديل للـ Light Mode' : 'التبديل للـ Dark Mode');
     }
   }
+  // Accent color family (green/blue/gray/red) — fully independent from
+  // light/dark; see CSS/root.css combined [data-color][data-theme] blocks
+  // and CSS/settings.css for the picker UI.
+  function applyThemeColor(color) {
+    document.documentElement.setAttribute('data-color', color);
+  }
 
   /* Custom checkbox: hidden native input (for real change events + a11y)
      plus a styled box with check/minus Iconify icons toggled by CSS
@@ -391,12 +397,12 @@
     row.appendChild(cb);
 
     const info = h('div', { class: 'word-info' });
-    info.appendChild(h('div', { class: 'word-top' }, [
-      h('span', { class: 'word-text', text: w.word }),
-      h('span', {
-        class: 'diff-badge ' + (w.status === 'easy' ? 'diff-easy' : 'diff-hard')
-      }, [icon(w.status === 'easy' ? 'lucide:check-circle' : 'lucide:alert-triangle'), h('span', { text: w.status === 'easy' ? 'سهل' : 'صعب' })])
-    ]));
+    const wordTopChildren = [h('span', { class: 'word-text', text: w.word })];
+    if (w.pos) wordTopChildren.push(h('span', { class: 'pos-badge', text: w.pos }));
+    wordTopChildren.push(h('span', {
+      class: 'diff-badge ' + (w.status === 'easy' ? 'diff-easy' : 'diff-hard')
+    }, [icon(w.status === 'easy' ? 'lucide:check-circle' : 'lucide:alert-triangle'), h('span', { text: w.status === 'easy' ? 'سهل' : 'صعب' })]));
+    info.appendChild(h('div', { class: 'word-top' }, wordTopChildren));
     info.appendChild(h('div', { class: 'word-meaning', text: w.meaning }));
 
     const extrasKeys = Object.keys(w.extras || {}).filter(function (k) { return k !== '_raw'; });
@@ -550,11 +556,12 @@
     } else {
       const qList = h('div', { class: 'quiz-history-list' });
       stats.recentQuizzes.forEach(function (q) {
-        qList.appendChild(h('div', { class: 'quiz-history-item' }, [
+        qList.appendChild(h('button', { class: 'quiz-history-item', onclick: function () { renderQuizDetail(q.id); } }, [
           h('span', { class: 'qh-mode', text: q.mode }),
           h('span', { class: 'qh-stat qh-correct' }, [icon('lucide:check'), h('span', { text: String(q.correct) })]),
           h('span', { class: 'qh-stat qh-wrong' }, [icon('lucide:x'), h('span', { text: String(q.wrong) })]),
-          h('span', { class: 'qh-stat qh-skipped' }, [icon('lucide:minus'), h('span', { text: String(q.skipped) })])
+          h('span', { class: 'qh-stat qh-skipped' }, [icon('lucide:minus'), h('span', { text: String(q.skipped) })]),
+          icon('lucide:chevron-left', 'nav-card-chevron')
         ]));
       });
       el.screen.appendChild(qList);
@@ -599,48 +606,43 @@
 
     const input = h('input', { type: 'text', class: 'quiz-input', placeholder: 'Your answer...', autocomplete: 'off', spellcheck: 'false' });
     body.appendChild(input);
-    const feedback = h('div', { class: 'quiz-feedback', id: 'quiz-feedback' });
-    body.appendChild(feedback);
+    // A quiet dot — confirms the answer registered without ever printing
+    // the correct word during the exam (see doSubmit/doSkip below). The
+    // full breakdown only appears on the results screen after the quiz ends.
+    const pulse = h('div', { class: 'quiz-pulse', id: 'quiz-pulse' });
+    body.appendChild(pulse);
 
     const actions = h('div', { class: 'quiz-actions' });
-    actions.appendChild(h('button', { class: 'btn btn-primary', onclick: function () { doSubmit(input.value); } }, [h('span', { text: 'Submit' })]));
-    actions.appendChild(h('button', { class: 'btn btn-secondary', onclick: doSkip }, [h('span', { text: 'Skip' })]));
+    const submitBtn = h('button', { class: 'btn btn-primary', onclick: function () { doSubmit(input.value); } }, [h('span', { text: 'Submit' })]);
+    const skipBtn = h('button', { class: 'btn btn-secondary', onclick: doSkip }, [h('span', { text: 'Skip' })]);
+    actions.appendChild(submitBtn);
+    actions.appendChild(skipBtn);
     body.appendChild(actions);
 
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doSubmit(input.value); } });
     setTimeout(function () { input.focus(); }, 30);
 
     let locked = false;
+    function lockUI(result) {
+      locked = true;
+      input.disabled = true;
+      submitBtn.disabled = true;
+      skipBtn.disabled = true;
+      input.classList.add('answered', 'answered-' + result);
+      pulse.className = 'quiz-pulse quiz-pulse-' + result;
+    }
     function doSubmit(value) {
       if (locked) return;
-      locked = true;
       const result = UX.submitQuizAnswer(value);
-      showFeedback(result, current.word);
-      setTimeout(function () { const next = UX.nextQuizQuestion(); if (next) renderQuizQuestion(); }, 900);
+      lockUI(result);
+      setTimeout(function () { const next = UX.nextQuizQuestion(); if (next) renderQuizQuestion(); }, 380);
     }
     function doSkip() {
       if (locked) return;
-      locked = true;
       UX.skipQuizQuestion();
-      showFeedback('skipped', current.word);
-      setTimeout(function () { const next = UX.nextQuizQuestion(); if (next) renderQuizQuestion(); }, 700);
+      lockUI('skipped');
+      setTimeout(function () { const next = UX.nextQuizQuestion(); if (next) renderQuizQuestion(); }, 320);
     }
-  }
-
-  function showFeedback(result, correctWord) {
-    const fb = document.getElementById('quiz-feedback');
-    if (!fb) return;
-    clear(fb);
-    fb.className = 'quiz-feedback feedback-' + result;
-    const map = {
-      correct: ['lucide:check-circle', 'صحيح'],
-      close: ['lucide:alert-circle', 'قريب — الإجابة: ' + correctWord],
-      wrong: ['lucide:x-circle', 'خطأ — الإجابة: ' + correctWord],
-      skipped: ['lucide:skip-forward', 'اتخطى — الإجابة: ' + correctWord]
-    };
-    const m = map[result] || map.wrong;
-    fb.appendChild(icon(m[0]));
-    fb.appendChild(h('span', { text: m[1] }));
   }
 
   function updateQuizTimer(payload) {
@@ -651,16 +653,16 @@
     if (timerWrap) timerWrap.classList.toggle('low-time', payload.timeLeft <= 30);
   }
 
-  function renderQuizFinished(summary) {
-    route = { screen: 'quiz-result' };
-    clear(el.screen);
-    el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'نتيجة الكويز' })]));
+  // Shared by the just-finished quiz screen AND by reopening any past quiz
+  // from the Statistics history list — same record shape either way, so
+  // exactly what you got wrong/skipped is always one look away.
+  function renderQuizResultCard(record) {
     const card = h('div', { class: 'card result-card' });
     const rows = [
-      ['result-total', 'lucide:list', 'الإجمالي', summary.total],
-      ['result-correct', 'lucide:check-circle', 'صح', summary.correct],
-      ['result-wrong', 'lucide:x-circle', 'غلط', summary.wrong],
-      ['result-skipped', 'lucide:skip-forward', 'اتخطى', summary.skipped]
+      ['result-total', 'lucide:list', 'الإجمالي', record.total],
+      ['result-correct', 'lucide:check-circle', 'صح', record.correct],
+      ['result-wrong', 'lucide:x-circle', 'غلط', record.wrong],
+      ['result-skipped', 'lucide:skip-forward', 'اتخطى', record.skipped]
     ];
     rows.forEach(function (r) {
       card.appendChild(h('div', { class: 'result-row ' + r[0] }, [
@@ -668,10 +670,77 @@
         h('span', { class: 'result-value', text: String(r[3]) })
       ]));
     });
-    if (summary.timedOut) card.appendChild(h('div', { class: 'result-timedout' }, [icon('lucide:clock'), h('span', { text: 'خلص الوقت' })]));
-    el.screen.appendChild(card);
+    if (record.timedOut) card.appendChild(h('div', { class: 'result-timedout' }, [icon('lucide:clock'), h('span', { text: 'خلص الوقت' })]));
+    return card;
+  }
+
+  function renderAnswerListInto(container, records, resultKind, emptyText) {
+    clear(container);
+    const filtered = (records || []).filter(function (a) { return a.result === resultKind; });
+    if (!filtered.length) {
+      container.appendChild(h('p', { class: 'empty-note', text: emptyText }));
+      return;
+    }
+    filtered.forEach(function (a) {
+      const rowChildren = [
+        h('div', { class: 'result-text' }, [
+          h('span', { class: 'result-word', text: a.correctWord }),
+          h('span', { class: 'result-meaning', text: a.meaning || '' })
+        ])
+      ];
+      if (resultKind === 'wrong' && a.userAnswer) {
+        rowChildren.push(h('span', { class: 'answer-you-wrote', text: a.userAnswer }));
+      }
+      container.appendChild(h('div', { class: 'result-row answer-review-row' }, rowChildren));
+    });
+  }
+
+  function renderQuizBreakdown(container, record) {
+    clear(container);
+    container.appendChild(h('h2', { class: 'section-title-flat breakdown-wrong' }, [icon('lucide:x-circle'), h('span', { text: 'الكلمات الغلط (' + record.wrong + ')' })]));
+    const wrongList = h('div', { class: 'review-list' });
+    renderAnswerListInto(wrongList, record.answers, 'wrong', 'مفيش غلط — كله تمام 🎉');
+    container.appendChild(wrongList);
+
+    container.appendChild(h('h2', { class: 'section-title-flat breakdown-skipped' }, [icon('lucide:skip-forward'), h('span', { text: 'الكلمات المتخطاة (' + record.skipped + ')' })]));
+    const skippedList = h('div', { class: 'review-list' });
+    renderAnswerListInto(skippedList, record.answers, 'skipped', 'مفيش كلمات اتخطيتها.');
+    container.appendChild(skippedList);
+  }
+
+  function renderQuizFinished(record) {
+    route = { screen: 'quiz-result' };
+    clear(el.screen);
+    el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'نتيجة الكويز' })]));
+    el.screen.appendChild(renderQuizResultCard(record));
+    const breakdown = h('div', { class: 'quiz-breakdown' });
+    renderQuizBreakdown(breakdown, record);
+    el.screen.appendChild(breakdown);
     el.screen.appendChild(h('button', { class: 'btn btn-primary', onclick: renderHome }, [h('span', { text: 'رجوع للرئيسية' })]));
     showNav('home');
+  }
+
+  /* ================= Quiz detail (reopening a past quiz from history) ================= */
+  function renderQuizDetail(recordId) {
+    const record = UX.getQuizRecord(recordId);
+    if (!record) { renderStatistics(); return; }
+    route = { screen: 'quiz-detail' };
+    clear(el.screen);
+    const d = new Date(record.ts);
+    const dateStr = d.toLocaleDateString('ar-EG') + ' · ' + d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+    el.screen.appendChild(h('header', { class: 'app-header' }, [
+      h('button', { class: 'icon-btn back-btn', onclick: renderStatistics }, [icon('lucide:arrow-right')]),
+      h('div', {}, [
+        h('h1', { class: 'title-lg', text: record.mode === 'selected' ? 'Selected Quiz' : 'Full Quiz' }),
+        h('p', { class: 'text-muted', text: dateStr })
+      ])
+    ]));
+    el.screen.appendChild(renderQuizResultCard(record));
+    const breakdown = h('div', { class: 'quiz-breakdown' });
+    renderQuizBreakdown(breakdown, record);
+    el.screen.appendChild(breakdown);
+    showNav('statistics');
   }
 
   /* ================= Navigation / boot ================= */
@@ -690,6 +759,10 @@
         b.addEventListener('click', function () {
           if (b.dataset.nav === 'home') renderHome();
           else if (b.dataset.nav === 'statistics') renderStatistics();
+          // 'settings' is implemented in JavaScript/settings.js (loaded
+          // after this file) which attaches UI.renderSettings — resolved
+          // dynamically here so load order between the two doesn't matter.
+          else if (b.dataset.nav === 'settings' && global.UI && global.UI.renderSettings) global.UI.renderSettings();
         });
       });
     }
@@ -697,12 +770,14 @@
     // Theme: applied once at boot, then fully driven by the toggle + the
     // 'theme-changed' event — never re-derived from the OS after that.
     applyTheme(UX.getTheme());
+    applyThemeColor(UX.getThemeColor());
     if (el.themeBtn) {
       el.themeBtn.addEventListener('click', function () {
         UX.setTheme(UX.getTheme() === 'dark' ? 'light' : 'dark');
       });
     }
     UX.on('theme-changed', applyTheme);
+    UX.on('theme-color-changed', applyThemeColor);
 
     UX.on('content-ready', renderHome);
     UX.on('content-load-blocked', renderLoadBlocked);

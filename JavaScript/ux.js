@@ -25,8 +25,11 @@
     manualReview: 'eenglish.manualReview',
     autoReview: 'eenglish.autoReview',
     quizHistory: 'eenglish.quizHistory',
-    theme: 'eenglish.theme'
+    theme: 'eenglish.theme',
+    themeColor: 'eenglish.themeColor',
+    keepAwake: 'eenglish.keepAwake'
   };
+  const THEME_COLORS = ['green', 'blue', 'gray', 'red'];
 
   function readLS(key, fallback) {
     try {
@@ -57,7 +60,9 @@
     // just silently omitting it (parsed from the filename itself, which
     // doesn't require the fetch to have succeeded).
     missingSections: [],
-    theme: readLS(LS_KEYS.theme, null) // null = no explicit user choice yet
+    theme: readLS(LS_KEYS.theme, null), // null = no explicit user choice yet
+    themeColor: readLS(LS_KEYS.themeColor, 'green'),
+    keepAwake: readLS(LS_KEYS.keepAwake, false)
   };
 
   /* ---------------- Word ID ---------------- */
@@ -118,7 +123,7 @@
         const body = line.replace(/^(🟢|🔴)\s*/u, '').trim();
         const parts = body.split('|').map(function (p) { return p.trim(); });
         if (parts.length < 2) continue;
-        const word = parts[0];
+        let word = parts[0];
         const meaning = parts[1];
         const extrasArr = parts.slice(2);
         const extras = {};
@@ -129,7 +134,17 @@
         } else {
           extras._raw = extrasArr;
         }
-        currentGroup.words.push({ word: word, meaning: meaning, status: status, extras: extras });
+        // Part of speech: an optional "[pos]" tag stuck to the end of the
+        // word itself, e.g. "waste [v.]" — stripped out here so `word`
+        // stays clean everywhere else (ids, quiz answers, search...).
+        // See the "طريقة الإضافة" note at the bottom of this file.
+        let pos = null;
+        const posMatch = word.match(/^(.*?)\s*\[([^\[\]]{1,12})\]\s*$/);
+        if (posMatch) {
+          word = posMatch[1].trim();
+          pos = posMatch[2].trim();
+        }
+        currentGroup.words.push({ word: word, meaning: meaning, status: status, extras: extras, pos: pos });
       }
     }
 
@@ -157,6 +172,7 @@
                 meaning: w.meaning,
                 status: w.status,
                 extras: w.extras,
+                pos: w.pos || null,
                 wordId: makeWordId(doc, gi, wi, w.word)
               };
             })
@@ -184,7 +200,7 @@
           section.groups.forEach(function (group, gi) {
             group.words.forEach(function (w) {
               idx.push({
-                wordId: w.wordId, word: w.word, meaning: w.meaning,
+                wordId: w.wordId, word: w.word, meaning: w.meaning, pos: w.pos || null,
                 unit: unit.unit, lessons: lesson.lessons, type: section.type,
                 groupIdx: gi, groupTitle: group.title
               });
@@ -349,7 +365,7 @@
       section.groups.forEach(function (group, gi) {
         group.words.forEach(function (w) {
           out.push({
-            wordId: w.wordId, word: w.word, meaning: w.meaning,
+            wordId: w.wordId, word: w.word, meaning: w.meaning, pos: w.pos || null,
             unit: unitNum, lessons: lesson.lessons, groupIdx: gi, groupTitle: group.title
           });
         });
@@ -440,8 +456,10 @@
     else if (result === 'skipped') state.quiz.skipped++;
     else { state.quiz.wrong++; setAutoReview(q.wordId, true); }
 
-    state.quiz.answers.push({ wordId: q.wordId, userAnswer: userAnswer, correctWord: q.word, result: result });
-    emit('quiz-answer', { result: result, correctWord: q.word, meaning: q.meaning });
+    state.quiz.answers.push({ wordId: q.wordId, userAnswer: userAnswer, correctWord: q.word, meaning: q.meaning, result: result });
+    // Note: no 'quiz-answer' reveal event anymore — the correct word must
+    // never be shown to the user mid-exam (only after the quiz ends), so
+    // ui.js no longer listens for this during an active question.
     return result;
   }
 
@@ -459,8 +477,7 @@
     const q = state.quiz.words[state.quiz.index];
     if (!q) return null;
     state.quiz.skipped++;
-    state.quiz.answers.push({ wordId: q.wordId, userAnswer: '', correctWord: q.word, result: 'skipped' });
-    emit('quiz-answer', { result: 'skipped', correctWord: q.word, meaning: q.meaning });
+    state.quiz.answers.push({ wordId: q.wordId, userAnswer: '', correctWord: q.word, meaning: q.meaning, result: 'skipped' });
     return 'skipped';
   }
 
@@ -472,20 +489,26 @@
       for (let i = q.index; i < q.words.length; i++) {
         const w = q.words[i];
         q.skipped++;
-        q.answers.push({ wordId: w.wordId, userAnswer: '', correctWord: w.word, result: 'skipped' });
+        q.answers.push({ wordId: w.wordId, userAnswer: '', correctWord: w.word, meaning: w.meaning, result: 'skipped' });
       }
     }
-    const summary = {
-      ts: Date.now(), mode: q.mode, total: q.words.length,
-      correct: q.correct, wrong: q.wrong, skipped: q.skipped, timedOut: !!timedOut
+    // Full per-attempt record — kept (not just the aggregate counts) so a
+    // past quiz can be reopened later and show exactly which words were
+    // wrong/skipped, per "كل كويز يكون مخزن عليه الغلطات والكلمات الي
+    // عملتلها skip" — see UI's quiz-history list + quiz detail screen.
+    const record = {
+      id: 'q_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
+      ts: Date.now(), mode: q.mode, ref: q.ref, total: q.words.length,
+      correct: q.correct, wrong: q.wrong, skipped: q.skipped, timedOut: !!timedOut,
+      answers: q.answers.slice()
     };
-    state.quizHistory.push(summary);
-    if (state.quizHistory.length > 20) state.quizHistory = state.quizHistory.slice(-20);
+    state.quizHistory.push(record);
+    if (state.quizHistory.length > 40) state.quizHistory = state.quizHistory.slice(-40);
     writeLS(LS_KEYS.quizHistory, state.quizHistory);
 
     state.quiz = null;
-    emit('quiz-finished', summary);
-    return summary;
+    emit('quiz-finished', record);
+    return record;
   }
 
   function abortQuiz() {
@@ -564,7 +587,7 @@
               }
               if (state.manualReview[w.wordId] || state.autoReview[w.wordId]) {
                 reviewWords.push({
-                  wordId: w.wordId, word: w.word, meaning: w.meaning,
+                  wordId: w.wordId, word: w.word, meaning: w.meaning, pos: w.pos || null,
                   unit: unit.unit, lessons: lesson.lessons, type: section.type,
                   groupIdx: gi, groupTitle: group.title
                 });
@@ -574,7 +597,7 @@
         });
       });
     });
-    const recent = state.quizHistory.slice(-5).reverse();
+    const recent = state.quizHistory.slice(-10).reverse();
     return {
       vocabulary: { total: vocabTotal, known: vocabKnown, progress: vocabTotal > 0 ? vocabKnown / vocabTotal : 0 },
       overall: { total: overallTotal, known: overallKnown, progress: overallTotal > 0 ? overallKnown / overallTotal : 0 },
@@ -609,6 +632,80 @@
     emit('theme-changed', theme);
   }
 
+  /* ---------------- Theme color (Settings: 4 premium accents) ---------------- */
+  function getThemeColor() {
+    return THEME_COLORS.indexOf(state.themeColor) !== -1 ? state.themeColor : 'green';
+  }
+  function setThemeColor(color) {
+    if (THEME_COLORS.indexOf(color) === -1) return;
+    state.themeColor = color;
+    writeLS(LS_KEYS.themeColor, color);
+    emit('theme-color-changed', color);
+  }
+
+  /* ---------------- Keep screen awake (Settings) ---------------- */
+  function getKeepAwake() { return !!state.keepAwake; }
+  function setKeepAwake(val) {
+    state.keepAwake = !!val;
+    writeLS(LS_KEYS.keepAwake, state.keepAwake);
+    emit('keep-awake-changed', state.keepAwake);
+  }
+
+  /* ---------------- Quiz history lookup (for the quiz-detail screen) ---------------- */
+  function getQuizRecord(id) {
+    for (let i = 0; i < state.quizHistory.length; i++) {
+      if (state.quizHistory[i].id === id) return state.quizHistory[i];
+    }
+    return null;
+  }
+
+  /* ---------------- Local data: export / import / delete-all ----------------
+     Everything the app stores is plain JSON in localStorage, so this is a
+     straight dump/restore of the known keys — used by the Settings screen's
+     "استخراج / استيراد / حذف كل البيانات" buttons. */
+  function exportAllData() {
+    return {
+      appVersion: 1,
+      exportedAt: Date.now(),
+      known: state.known,
+      manualReview: state.manualReview,
+      autoReview: state.autoReview,
+      quizHistory: state.quizHistory,
+      theme: state.theme,
+      themeColor: state.themeColor,
+      keepAwake: state.keepAwake
+    };
+  }
+  function importAllData(obj) {
+    if (!obj || typeof obj !== 'object') return false;
+    try {
+      if (obj.known && typeof obj.known === 'object') { state.known = obj.known; writeLS(LS_KEYS.known, state.known); }
+      if (obj.manualReview && typeof obj.manualReview === 'object') { state.manualReview = obj.manualReview; writeLS(LS_KEYS.manualReview, state.manualReview); }
+      if (obj.autoReview && typeof obj.autoReview === 'object') { state.autoReview = obj.autoReview; writeLS(LS_KEYS.autoReview, state.autoReview); }
+      if (Array.isArray(obj.quizHistory)) { state.quizHistory = obj.quizHistory.slice(-40); writeLS(LS_KEYS.quizHistory, state.quizHistory); }
+      if (obj.theme === 'light' || obj.theme === 'dark') { state.theme = obj.theme; writeLS(LS_KEYS.theme, state.theme); }
+      if (THEME_COLORS.indexOf(obj.themeColor) !== -1) { state.themeColor = obj.themeColor; writeLS(LS_KEYS.themeColor, state.themeColor); }
+      if (typeof obj.keepAwake === 'boolean') { state.keepAwake = obj.keepAwake; writeLS(LS_KEYS.keepAwake, state.keepAwake); }
+      emit('data-imported', {});
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function resetAllData() {
+    state.known = {};
+    state.manualReview = {};
+    state.autoReview = {};
+    state.quizHistory = [];
+    state.theme = null;
+    state.themeColor = 'green';
+    state.keepAwake = false;
+    Object.keys(LS_KEYS).forEach(function (k) {
+      try { localStorage.removeItem(LS_KEYS[k]); } catch (e) {}
+    });
+    emit('data-reset', {});
+  }
+
   /* ---------------- Public API ---------------- */
   global.UX = {
     on: on, emit: emit,
@@ -618,7 +715,11 @@
     getLessonVocabularyProgress: getLessonVocabularyProgress,
     getMissingSections: function () { return state.missingSections.slice(); },
     getTheme: getTheme, setTheme: setTheme,
+    getThemeColor: getThemeColor, setThemeColor: setThemeColor, getThemeColors: function () { return THEME_COLORS.slice(); },
+    getKeepAwake: getKeepAwake, setKeepAwake: setKeepAwake,
     getQuizHistory: function () { return state.quizHistory.slice(); },
+    getQuizRecord: getQuizRecord,
+    exportAllData: exportAllData, importAllData: importAllData, resetAllData: resetAllData,
     isKnown: isKnown, isManualReview: isManualReview, isAutoReview: isAutoReview, needsReview: needsReview,
     toggleKnown: toggleKnown, toggleManualReview: toggleManualReview,
     setKnown: setKnown, setGroupKnown: setGroupKnown, getGroupTriState: getGroupTriState,
