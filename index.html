@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="CSS/root.css" />
   <link rel="stylesheet" href="CSS/responsive.css" />
   <link rel="stylesheet" href="CSS/animations.css" />
+  <link rel="stylesheet" href="CSS/settings.css" />
 
   <!-- Iconify: unified icon system for the whole app (replaces raw emoji) -->
   <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
@@ -28,11 +29,16 @@
         <iconify-icon icon="lucide:bar-chart-2" class="icon"></iconify-icon>
         <span>Statistics</span>
       </button>
+      <button class="nav-btn" data-nav="settings">
+        <iconify-icon icon="lucide:settings" class="icon"></iconify-icon>
+        <span>Settings</span>
+      </button>
     </nav>
   </div>
 
   <script src="JavaScript/ux.js"></script>
   <script src="JavaScript/ui.js"></script>
+  <script src="JavaScript/settings.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       UI.init();
