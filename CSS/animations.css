@@ -87,7 +87,7 @@
 
 /* ---------- Theme switch: smooth color transition across the whole app,
    not an instant color-snap, without adding any heavy visual effect ---------- */
-body, .card, .section-card, .nav-card, .group, .word-row, .result-row,
+body, .card, .section-card, .nav-card, .group, .result-row,
 .bottom-nav, .theme-toggle-btn, .search-box, .quiz-input,
 .settings-card, .settings-row, .quiz-history-item, .theme-color-swatch, .switch-track {
   transition: background-color var(--t-med) var(--ease-out),
@@ -99,3 +99,23 @@ body, .card, .section-card, .nav-card, .group, .word-row, .result-row,
   to   { transform: rotate(0deg); }
 }
 .theme-toggle-btn:active .icon { animation: theme-btn-spin var(--t-fast) var(--ease-out); }
+
+/* ---------- Word card: light state transitions ---------- */
+.word-card {
+  transition: background-color var(--t-med) var(--ease-out),
+              border-color var(--t-med) var(--ease-out),
+              color var(--t-med) var(--ease-out);
+}
+.word-card::before { transition: transform var(--t-med) var(--ease-out); }
+.word-state, .word-state-icon { transition: color var(--t-fast) var(--ease-out); }
+/* Deep-link flash on a card animates only the ring, so the card keeps its
+   own known/review background and radius afterwards. */
+@keyframes word-card-flash {
+  0%   { box-shadow: 0 0 0 3px var(--color-review); }
+  100% { box-shadow: var(--shadow-sm); }
+}
+.word-card.highlight-flash { animation: word-card-flash 2.2s var(--ease-out); border-radius: var(--r-md); }
+@media (prefers-reduced-motion: reduce) {
+  .word-card, .word-card::before, .word-state, .word-state-icon { transition: none; }
+  .flag-btn.active { animation: none; }
+}

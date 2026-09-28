@@ -32,7 +32,7 @@ button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
    search-result words) gets its own font + a touch more size — this is
    what was missing before ("الكلام الانجليزي بنفس حجم وخط العربي"). */
 .word-text, .quiz-input, .quiz-input::placeholder, .result-word,
-.extra-chip span, .pos-badge, .swatch-label {
+.extra-chip-text, .pos-badge, .swatch-label {
   font-family: var(--font-en);
 }
 .word-text, .result-word { direction: ltr; unicode-bidi: isolate; }
@@ -214,58 +214,89 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .group-body { display: none; flex-direction: column; }
 .group.open .group-body { display: flex; }
 
-/* ---------- Word row ---------- */
-.word-row {
-  display: flex; align-items: flex-start; gap: var(--sp-sm);
-  padding: var(--sp-sm) var(--sp-md);
-  border-top: 1px solid var(--color-border);
+/* ---------- Word card ----------
+   Hierarchy: word (hero) → POS → meaning → extras → footer actions.
+   Mobile-first; colors come only from the shared theme/accent tokens. */
+.word-card {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: var(--sp-xs);
+  margin: var(--sp-xs) var(--sp-sm) 0;
+  padding: var(--sp-sm) var(--sp-md) var(--sp-xs);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
 }
-.word-row:hover { background: var(--color-surface-alt); }
-.word-cb { margin-top: 2px; }
-.word-info { flex: 1; min-width: 0; }
-.word-top { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-xs) var(--sp-sm); }
-.word-text { font-weight: var(--fw-bold); font-size: 16.5px; }
-.word-meaning { color: var(--color-text); font-size: var(--font-size-sm); margin-top: 3px; }
+.word-card:last-child { margin-bottom: var(--sp-sm); }
+/* Known: quiet mint tint + a thin accent bar on the reading-start edge. */
+.word-card::before {
+  content: ''; position: absolute; inset-block: 0; inset-inline-start: 0;
+  width: 4px; background: var(--color-primary);
+  transform: scaleY(0); transform-origin: center;
+}
+.word-card.is-known { background: var(--color-mint); border-color: var(--color-mint-strong); }
+.word-card.is-known::before { transform: scaleY(1); }
+.word-card.is-review { border-color: var(--color-review); }
 
-/* Part of speech badge — small pill right next to the word, its own
-   neutral color so it stays legible across every accent theme. */
+.word-card-head { display: flex; align-items: flex-start; gap: var(--sp-sm); min-width: 0; }
+/* 44px touch target; negative margins keep the visual box compact. */
+.word-cb { justify-content: center; min-width: 44px; min-height: 44px; margin: -10px -10px -10px 0; }
+.word-cb .cb-box { width: 26px; height: 26px; border-radius: 8px; }
+.cb-input:focus-visible ~ .cb-box, .flag-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.word-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.word-text {
+  max-width: 100%;
+  font-weight: var(--fw-bold);
+  font-size: clamp(21px, 5.8vw, 26px); line-height: 1.25; letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
 .pos-badge {
   display: inline-flex; align-items: center;
-  padding: 1px 7px; border-radius: var(--r-pill);
-  font-size: 10.5px; font-weight: var(--fw-medium); font-style: italic;
+  padding: 1px 8px; border-radius: var(--r-pill);
+  font-size: 11px; font-weight: var(--fw-medium); font-style: italic; line-height: 1.6;
   background: var(--color-pos-bg); color: var(--color-pos-text);
-  line-height: 1.6;
 }
-
 .diff-badge {
-  display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
   padding: 2px 8px; border-radius: var(--r-pill);
   font-size: var(--font-size-xs); font-weight: var(--fw-medium);
-  flex-shrink: 0; margin-inline-start: auto;
 }
 .diff-badge .icon { font-size: 14px; }
 .diff-easy { background: var(--color-success-bg); color: var(--color-success); }
 .diff-hard { background: var(--color-danger-bg); color: var(--color-danger); }
 
-.extras-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--sp-xs); }
+.word-meaning {
+  margin: 0; font-size: var(--font-size-md); line-height: 1.75;
+  color: var(--color-text); overflow-wrap: anywhere;
+}
+
+/* Extras: secondary layer, separated by a dashed rule; absent → no space. */
+.word-extras {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding-top: var(--sp-xs); border-top: 1px dashed var(--color-border);
+}
 .extra-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: var(--color-surface-alt);
-  border-radius: var(--r-pill);
-  padding: 2px 8px;
-  font-size: var(--font-size-xs);
+  display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
+  background: var(--color-surface-alt); border-radius: var(--r-pill);
+  padding: 3px 10px; font-size: var(--font-size-sm); color: var(--color-text-muted);
+}
+.extra-chip-text { unicode-bidi: isolate; overflow-wrap: anywhere; }
+.extra-chip-icon { font-size: 14px; }
+.word-extras-raw { display: block; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
+.word-card-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-sm); }
+.word-state { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); font-weight: var(--fw-medium); color: var(--color-text-muted); }
+.word-card.is-known .word-state { color: var(--color-success); }
+.word-state-icon { display: inline-flex; }
+.flag-btn {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  min-height: 40px; padding: 0 var(--sp-sm); border-radius: var(--r-pill);
+  font-size: var(--font-size-xs); font-weight: var(--fw-medium);
   color: var(--color-text-muted);
 }
-.extra-chip-icon { font-size: 13px; }
-.word-extras-raw { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: var(--sp-xs); }
-
-.flag-btn {
-  width: 34px; height: 34px; border-radius: var(--r-sm);
-  display: inline-flex; align-items: center; justify-content: center;
-  color: var(--color-text-muted); opacity: 0.55; flex-shrink: 0;
-}
-.flag-btn:hover { opacity: 0.9; }
-.flag-btn.active { color: var(--color-review); background: var(--color-review-bg); opacity: 1; }
+.flag-btn:hover { background: var(--color-surface-alt); }
+.flag-btn.active { color: var(--color-review); background: var(--color-review-bg); }
 
 /* ---------- Quiz ---------- */
 .quiz-header { justify-content: space-between; }
@@ -464,5 +495,5 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
   .quiz-launch-row { flex-direction: column; }
   .app-logo { height: 32px; }
   :root { --nav-height: 58px; }
-  .word-top { gap: 4px var(--sp-xs); }
+  .word-card { margin-inline: var(--sp-xs); padding-inline: var(--sp-sm); }
 }
