@@ -27,11 +27,11 @@
     return node;
   }
   function icon(name, extraClass) {
-    return h('iconify-icon', { icon: name, class: 'icon' + (extraClass ? ' ' + extraClass : '') });
+    return Icons.svg(name, extraClass);
   }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
-  const COLOR_LABELS = { green: 'أخضر', blue: 'أزرق', gray: 'رمادي', red: 'أحمر' };
+  const COLOR_LABELS = { green: 'أخضر', blue: 'أزرق', gray: 'رمادي', red: 'أحمر', purple: 'بنفسجي', lemon: 'ليموني' };
 
   /* ---------------- Wake Lock (keep screen on) ----------------
      Best-effort only: unsupported browsers just keep the toggle off and
@@ -115,13 +115,9 @@
   /* ================= Settings screen ================= */
   function render() {
     const screen = document.getElementById('screen-container');
-    const nav = document.getElementById('bottom-nav');
     if (!screen) return;
     clear(screen);
-    if (nav) {
-      nav.hidden = false;
-      nav.querySelectorAll('.nav-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.nav === 'settings'); });
-    }
+    if (global.UI && global.UI.showNav) global.UI.showNav('settings');
 
     screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'الإعدادات' })]));
 
@@ -177,7 +173,7 @@
     screen.appendChild(appearanceCard);
 
     /* ---- Data ---- */
-    screen.appendChild(h('h2', { class: 'section-title-flat' }, [icon('lucide:database'), h('span', { text: 'البيانات' })]));
+    screen.appendChild(h('h2', { class: 'section-title-flat' }, [icon('database'), h('span', { text: 'Advanced · متقدم' })]));
     const dataCard = h('div', { class: 'card settings-card' });
 
     dataCard.appendChild(h('button', {
@@ -198,6 +194,9 @@
       reader.onload = function () {
         let parsed = null;
         try { parsed = JSON.parse(String(reader.result)); } catch (e) { parsed = null; }
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          if (!confirm('الاستيراد هيستبدل تقدمك الحالي بالبيانات اللي في الملف. تكمل؟')) return;
+        }
         if (parsed && UX.importAllData(parsed)) {
           showToast('اتستوردت البيانات بنجاح ✅', 'ok');
           render();
@@ -225,6 +224,58 @@
       }
     }, [icon('lucide:trash-2'), h('span', { text: 'حذف كل البيانات' })]));
     screen.appendChild(dataCard);
+
+    /* ---- Advanced: device / browser capabilities ----
+       Every value comes straight from a browser API — nothing here is
+       guessed or computed indirectly. If the API isn't exposed by this
+       browser, the row shows "N/A" instead of a fabricated number. */
+    const deviceCard = h('div', { class: 'card settings-card device-info-card' });
+    deviceCard.appendChild(h('div', { class: 'settings-row-title device-info-head' }, [icon('cpu'), h('span', { text: 'الجهاز والمتصفح' })]));
+
+    function infoRow(label, value) {
+      return h('div', { class: 'device-info-row' }, [
+        h('span', { class: 'text-muted', text: label }),
+        h('span', { class: 'device-info-value', text: value })
+      ]);
+    }
+    const nav = global.navigator || {};
+    const rowsWrap = h('div', { class: 'device-info-rows' });
+    rowsWrap.appendChild(infoRow('نوى المعالج (Logical CPU cores)', typeof nav.hardwareConcurrency === 'number' ? String(nav.hardwareConcurrency) : 'N/A'));
+    rowsWrap.appendChild(infoRow('الذاكرة (RAM) التقريبية', typeof nav.deviceMemory === 'number' ? (nav.deviceMemory + ' GB') : 'N/A'));
+    rowsWrap.appendChild(infoRow('نوع الاتصال', (nav.connection && nav.connection.effectiveType) ? nav.connection.effectiveType : 'N/A'));
+    rowsWrap.appendChild(infoRow('حالة الاتصال', typeof nav.onLine === 'boolean' ? (nav.onLine ? 'متصل بالإنترنت' : 'أوفلاين') : 'N/A'));
+    rowsWrap.appendChild(infoRow('النظام/المنصة', nav.platform || (nav.userAgentData && nav.userAgentData.platform) || 'N/A'));
+    rowsWrap.appendChild(infoRow('لغة المتصفح', nav.language || 'N/A'));
+    rowsWrap.appendChild(infoRow('أبعاد الشاشة', (global.screen && global.screen.width) ? (global.screen.width + ' × ' + global.screen.height + ' px') : 'N/A'));
+    rowsWrap.appendChild(infoRow('كثافة البكسل (DPR)', typeof global.devicePixelRatio === 'number' ? String(global.devicePixelRatio) : 'N/A'));
+    const storageRow = infoRow('مساحة التخزين المستخدمة', 'جارٍ الحساب...');
+    rowsWrap.appendChild(storageRow);
+    deviceCard.appendChild(rowsWrap);
+    screen.appendChild(deviceCard);
+
+    function formatBytes(n) {
+      if (typeof n !== 'number' || !isFinite(n)) return 'N/A';
+      if (n < 1024) return n + ' B';
+      const units = ['KB', 'MB', 'GB', 'TB'];
+      let v = n, i = -1;
+      do { v /= 1024; i++; } while (v >= 1024 && i < units.length - 1);
+      return v.toFixed(1) + ' ' + units[i];
+    }
+    if (nav.storage && typeof nav.storage.estimate === 'function') {
+      nav.storage.estimate().then(function (est) {
+        const valueEl = storageRow.querySelector('.device-info-value');
+        if (!valueEl) return;
+        const used = formatBytes(est && est.usage);
+        const quota = formatBytes(est && est.quota);
+        valueEl.textContent = (used === 'N/A' || quota === 'N/A') ? 'N/A' : (used + ' / ' + quota);
+      }).catch(function () {
+        const valueEl = storageRow.querySelector('.device-info-value');
+        if (valueEl) valueEl.textContent = 'N/A';
+      });
+    } else {
+      const valueEl = storageRow.querySelector('.device-info-value');
+      if (valueEl) valueEl.textContent = 'N/A';
+    }
   }
 
   global.UI = global.UI || {};

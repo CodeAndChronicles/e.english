@@ -28,7 +28,7 @@
     return node;
   }
   function icon(name, extraClass) {
-    return h('iconify-icon', { icon: name, class: 'icon' + (extraClass ? ' ' + extraClass : '') });
+    return Icons.svg(name, extraClass);
   }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
   function formatTime(sec) {
@@ -37,16 +37,39 @@
     return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
   }
 
-  const el = { screen: null, nav: null, themeBtn: null };
+  const el = { screen: null, nav: null, sideNav: null, themeBtn: null };
+  const NAV_ICONS = { home: 'home', statistics: 'bar-chart-2', settings: 'settings' };
   let route = { screen: 'home' };
   let lessonProgressRef = null; // { unit, lessonKey, fillEl, textEl } — live-updated, not rebuilt
   let statsRefs = null; // live-updatable stats DOM refs, set by renderStatistics()
 
+  // Both nav bars (bottom nav for phones, side nav for large screens) are
+  // always kept in the same state — CSS alone decides which one is
+  // actually visible at a given viewport width (see responsive.css).
+  function eachNav(fn) {
+    [el.nav, el.sideNav].forEach(function (n) { if (n) fn(n); });
+  }
   function showNav(active) {
-    if (!el.nav) return;
-    el.nav.hidden = false;
-    el.nav.querySelectorAll('.nav-btn').forEach(function (b) {
-      b.classList.toggle('active', b.dataset.nav === active);
+    eachNav(function (n) {
+      n.hidden = false;
+      n.querySelectorAll('.nav-btn').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.nav === active);
+      });
+    });
+  }
+  function wireNav(navEl) {
+    if (!navEl) return;
+    navEl.querySelectorAll('.nav-btn').forEach(function (b) {
+      const iconName = NAV_ICONS[b.dataset.nav];
+      if (iconName && !b.querySelector('.icon')) b.insertBefore(icon(iconName), b.firstChild);
+      b.addEventListener('click', function () {
+        if (b.dataset.nav === 'home') renderHome();
+        else if (b.dataset.nav === 'statistics') renderStatistics();
+        // 'settings' is implemented in JavaScript/settings.js (loaded
+        // after this file) which attaches UI.renderSettings — resolved
+        // dynamically here so load order between the two doesn't matter.
+        else if (b.dataset.nav === 'settings' && global.UI && global.UI.renderSettings) global.UI.renderSettings();
+      });
     });
   }
 
@@ -54,21 +77,33 @@
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     if (el.themeBtn) {
-      const ic = el.themeBtn.querySelector('iconify-icon');
+      clear(el.themeBtn);
       // Icon shows the action available (switch-to), not the current state.
-      if (ic) ic.setAttribute('icon', theme === 'dark' ? 'lucide:sun' : 'lucide:moon');
+      el.themeBtn.appendChild(icon(theme === 'dark' ? 'sun' : 'moon'));
       el.themeBtn.setAttribute('aria-label', theme === 'dark' ? 'التبديل للـ Light Mode' : 'التبديل للـ Dark Mode');
     }
+    syncMetaThemeColor();
   }
   // Accent color family (green/blue/gray/red) — fully independent from
   // light/dark; see CSS/root.css combined [data-color][data-theme] blocks
   // and CSS/settings.css for the picker UI.
   function applyThemeColor(color) {
     document.documentElement.setAttribute('data-color', color);
+    syncMetaThemeColor();
+  }
+  // Browser/mobile toolbar color follows the active theme + accent:
+  // accent color in light mode, page background in dark mode.
+  function syncMetaThemeColor() {
+    const meta = document.getElementById('meta-theme-color');
+    if (!meta) return;
+    const cs = getComputedStyle(document.documentElement);
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const val = (dark ? cs.getPropertyValue('--color-bg') : cs.getPropertyValue('--color-primary')).trim();
+    if (val) meta.setAttribute('content', val);
   }
 
   /* Custom checkbox: hidden native input (for real change events + a11y)
-     plus a styled box with check/minus Iconify icons toggled by CSS
+     plus a styled box with check/minus local SVG icons toggled by CSS
      (:checked / :indeterminate), per "checkbox state must be obvious". */
   function customCheckbox(opts) {
     const input = h('input', { type: 'checkbox', class: 'cb-input visually-hidden' });
@@ -103,7 +138,7 @@
   function renderSkeleton() {
     route = { screen: 'skeleton' };
     clear(el.screen);
-    if (el.nav) el.nav.hidden = true;
+    eachNav(function (n) { n.hidden = true; });
     const wrap = h('div', { class: 'skeleton-wrap' });
     wrap.appendChild(h('div', { class: 'sk sk-header' }));
     wrap.appendChild(h('div', { class: 'sk sk-search' }));
@@ -116,7 +151,7 @@
   function renderLoadBlocked() {
     route = { screen: 'load-blocked' };
     clear(el.screen);
-    if (el.nav) el.nav.hidden = true;
+    eachNav(function (n) { n.hidden = true; });
     const wrap = h('div', { class: 'card blocked-card' }, [
       icon('lucide:server-off', 'blocked-icon'),
       h('h1', { class: 'title-lg', text: 'محتاج تشغّل الموقع من سيرفر محلي' }),
@@ -501,9 +536,11 @@
 
     el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Statistics' })]));
 
+    const statsGrid = h('div', { class: 'stats-cards-grid' });
+
     // Vocabulary progress — separate from overall/global study stats so
     // Synonyms/Idioms/Derivatives never dilute this percentage.
-    const vocabCard = h('div', { class: 'card' });
+    const vocabCard = h('div', { class: 'card stats-card' });
     const vocabText = h('span', { class: 'stats-value', text: stats.vocabulary.known + ' / ' + stats.vocabulary.total + ' (' + Math.round(stats.vocabulary.progress * 100) + '%)' });
     vocabCard.appendChild(h('div', { class: 'stats-row' }, [
       h('span', { class: 'text-muted', text: 'تقدّم المفردات (Vocabulary)' }),
@@ -514,11 +551,11 @@
     vocabFill.style.width = Math.round(stats.vocabulary.progress * 100) + '%';
     vocabBar.appendChild(vocabFill);
     vocabCard.appendChild(vocabBar);
-    el.screen.appendChild(vocabCard);
+    statsGrid.appendChild(vocabCard);
 
     // Overall/global — every section type combined (used for a general
     // sense of study activity, intentionally not called "Vocabulary").
-    const overallCard = h('div', { class: 'card' });
+    const overallCard = h('div', { class: 'card stats-card' });
     overallCard.appendChild(h('div', { class: 'stats-row' }, [
       h('span', { class: 'text-muted', text: 'كل المحتوى (كل الأقسام)' }),
       h('span', { class: 'stats-value', text: Math.round(stats.overall.progress * 100) + '%' })
@@ -533,7 +570,8 @@
       h('span', { class: 'text-muted', text: 'محفوظ' }),
       overallText
     ]));
-    el.screen.appendChild(overallCard);
+    statsGrid.appendChild(overallCard);
+    el.screen.appendChild(statsGrid);
 
     const reviewHead = h('h2', { class: 'section-title-flat' }, [
       icon('lucide:flag'), h('span', { text: 'كلمات محتاجة مراجعة (' + stats.reviewWords.length + ')' })
@@ -752,20 +790,11 @@
   function init() {
     el.screen = document.getElementById('screen-container');
     el.nav = document.getElementById('bottom-nav');
+    el.sideNav = document.getElementById('side-nav');
     el.themeBtn = document.getElementById('theme-toggle-btn');
 
-    if (el.nav) {
-      el.nav.querySelectorAll('.nav-btn').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (b.dataset.nav === 'home') renderHome();
-          else if (b.dataset.nav === 'statistics') renderStatistics();
-          // 'settings' is implemented in JavaScript/settings.js (loaded
-          // after this file) which attaches UI.renderSettings — resolved
-          // dynamically here so load order between the two doesn't matter.
-          else if (b.dataset.nav === 'settings' && global.UI && global.UI.renderSettings) global.UI.renderSettings();
-        });
-      });
-    }
+    wireNav(el.nav);
+    wireNav(el.sideNav);
 
     // Theme: applied once at boot, then fully driven by the toggle + the
     // 'theme-changed' event — never re-derived from the OS after that.
@@ -805,6 +834,7 @@
     renderLesson: renderLesson,
     renderStatistics: renderStatistics,
     renderQuiz: renderQuiz,
-    navigateToWord: navigateToWord
+    navigateToWord: navigateToWord,
+    showNav: showNav
   };
 })(window);
