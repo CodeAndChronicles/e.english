@@ -54,6 +54,8 @@
 .swatch-blue { background: #2F5FA8; }
 .swatch-gray { background: #55606B; }
 .swatch-red { background: #B23A48; }
+.swatch-purple { background: #7A4FB0; }
+.swatch-lemon { background: #C9A421; }
 .swatch-label { font-size: var(--font-size-sm); }
 
 /* ---- Toggle switch (keep screen awake) ---- */
@@ -91,5 +93,23 @@
 .settings-toast-warn { background: var(--color-review); color: #1B2521; }
 
 @media (min-width: 480px) {
-  .theme-color-grid { grid-template-columns: repeat(4, 1fr); }
+  .theme-color-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ---- Advanced: device info ---- */
+.device-info-head { display: flex; align-items: center; gap: var(--sp-xs); padding: var(--sp-md) 0 var(--sp-xs); }
+.device-info-rows { display: flex; flex-direction: column; }
+.device-info-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-md);
+  padding: var(--sp-sm) 0; border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+.device-info-row:last-child { border-bottom: none; }
+.device-info-value { font-weight: var(--fw-medium); direction: ltr; text-align: end; overflow-wrap: anywhere; }
+
+/* Desktop: two cards side by side use the wide space; toast clears the
+   side nav instead of sitting above a bottom nav that isn't there. */
+@media (min-width: 1024px) {
+  .settings-toast { bottom: var(--sp-xl); }
+  .settings-action-btn { width: auto; min-width: 280px; }
 }

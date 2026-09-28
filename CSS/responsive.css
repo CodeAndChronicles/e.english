@@ -14,12 +14,19 @@ html, body {
   background: var(--color-bg);
   direction: rtl;
 }
+/* Layout-stability guards: reserve the scrollbar gutter (no horizontal
+   jump when a screen becomes scrollable), never scroll sideways, and let
+   long words/URLs wrap instead of stretching a card. */
+html { scrollbar-gutter: stable; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; overflow-wrap: break-word; }
+img, svg { max-width: 100%; }
+#screen-container > * { min-width: 0; }
 button, input { font-family: inherit; font-size: inherit; color: inherit; }
 button { cursor: pointer; border: none; background: none; text-align: inherit; }
 button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
 
-.icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+.icon { display: inline-block; width: 1em; height: 1em; font-size: 20px; line-height: 1; flex-shrink: 0; }
 
 /* English content (the word itself, typed answers, synonym/antonym chips,
    search-result words) gets its own font + a touch more size — this is
@@ -314,6 +321,8 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .result-timedout { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--color-review); margin-top: var(--sp-sm); font-weight: var(--fw-bold); }
 
 /* ---------- Statistics ---------- */
+.stats-cards-grid { display: flex; flex-direction: column; gap: var(--sp-md); margin-bottom: var(--sp-lg); }
+.stats-card { margin-bottom: 0; }
 .stats-row { display: flex; justify-content: space-between; padding: var(--sp-xs) 0; gap: var(--sp-sm); }
 .stats-value { font-weight: var(--fw-bold); flex-shrink: 0; }
 .progress-bar { width: 100%; height: 10px; background: var(--color-surface-alt); border-radius: var(--r-pill); overflow: hidden; margin: var(--sp-sm) 0; }
@@ -387,6 +396,34 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
 .nav-btn .icon { font-size: 22px; }
 .nav-btn.active { color: var(--color-primary); }
 
+/* ---------- Side nav (large screens — replaces the bottom nav so wide
+   screens use a proper app-shell layout instead of a stretched phone
+   pattern) ---------- */
+.side-nav {
+  display: none;
+  position: fixed;
+  inset-inline-end: 0;
+  top: 0; bottom: 0;
+  width: var(--side-nav-width);
+  flex-direction: column;
+  gap: var(--sp-2xs);
+  padding: var(--sp-lg) var(--sp-md);
+  background: var(--color-surface);
+  border-inline-start: 1px solid var(--color-border);
+  z-index: 150;
+  overflow-y: auto;
+}
+.side-nav-logo { height: 40px; width: auto; border-radius: var(--r-sm); margin: 0 0 var(--sp-lg) var(--sp-xs); align-self: flex-start; }
+.side-nav .nav-btn {
+  flex-direction: row; justify-content: flex-start; gap: var(--sp-sm);
+  width: 100%; padding: var(--sp-sm) var(--sp-md);
+  border-radius: var(--r-md);
+  font-size: var(--font-size-md);
+}
+.side-nav .nav-btn .icon { width: 22px; height: 22px; font-size: 22px; }
+.side-nav .nav-btn:hover { background: var(--color-surface-alt); }
+.side-nav .nav-btn.active { background: var(--color-mint); color: var(--color-primary); font-weight: var(--fw-medium); }
+
 /* ---------- Skeleton ---------- */
 .skeleton-wrap { display: flex; flex-direction: column; gap: var(--sp-sm); }
 .sk { border-radius: var(--r-md); background: var(--color-surface-alt); }
@@ -397,23 +434,35 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
 
 /* ================= Responsive breakpoints ================= */
 @media (min-width: 480px) {
-  .theme-color-grid { grid-template-columns: repeat(4, 1fr); }
+  .theme-color-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (min-width: 640px) {
   #screen-container { padding: var(--sp-lg); }
   .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-md); }
+  .stats-cards-grid { display: grid; grid-template-columns: 1fr 1fr; }
 }
 @media (min-width: 1024px) {
-  :root { --content-max-width: 920px; }
-  #screen-container { padding: var(--sp-xl) var(--sp-lg); }
+  :root { --content-max-width: 960px; }
+
+  /* App-shell layout: side rail instead of the phone's bottom nav — the
+     rail is fixed to the edge, and #app reserves that width so the
+     centered content column never runs underneath it. */
+  .bottom-nav { display: none; }
+  .side-nav { display: flex; }
+  #app { padding-inline-end: var(--side-nav-width); }
+  #screen-container { padding: var(--sp-xl) var(--sp-xl); padding-bottom: var(--sp-xl); }
+
   .card-grid { grid-template-columns: 1fr 1fr 1fr; }
+  .sections-wrap { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: var(--sp-lg); }
+  .review-list, .quiz-history-list { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-sm); }
+}
+@media (min-width: 1280px) {
+  :root { --content-max-width: 1120px; }
+  .card-grid { grid-template-columns: repeat(4, 1fr); }
 }
 @media (max-width: 400px) {
   .quiz-launch-row { flex-direction: column; }
   .app-logo { height: 32px; }
   :root { --nav-height: 58px; }
   .word-top { gap: 4px var(--sp-xs); }
-}
-@media (min-width: 1024px) {
-  .bottom-nav { border-radius: var(--r-lg) var(--r-lg) 0 0; }
 }

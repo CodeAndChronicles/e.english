@@ -44,6 +44,7 @@
   /* ---- Layout ---- */
   --nav-height: 64px;
   --content-max-width: 720px;
+  --side-nav-width: 236px;
 
   /* ---- Motion ---- */
   --t-fast: 0.14s;
@@ -167,4 +168,24 @@
 :root[data-color="red"][data-theme="dark"] {
   --color-primary: #E3808C; --color-primary-dark: #F2AEB4;
   --color-mint: #331519; --color-mint-strong: #451C21; --color-primary-contrast: #1A0A0C;
+}
+
+/* ---- Purple (muted plum/violet accent) ---- */
+:root[data-color="purple"][data-theme="light"] {
+  --color-primary: #7A4FB0; --color-primary-dark: #52347D;
+  --color-mint: #F1EBF9; --color-mint-strong: #E1D2F1; --color-primary-contrast: #ffffff;
+}
+:root[data-color="purple"][data-theme="dark"] {
+  --color-primary: #B698E0; --color-primary-dark: #D6C3F0;
+  --color-mint: #241B34; --color-mint-strong: #322547; --color-primary-contrast: #130E1C;
+}
+
+/* ---- Lemon (warm, desaturated yellow-gold accent) ---- */
+:root[data-color="lemon"][data-theme="light"] {
+  --color-primary: #A98A1F; --color-primary-dark: #755E12;
+  --color-mint: #FBF6E3; --color-mint-strong: #F2E7BE; --color-primary-contrast: #2B2205;
+}
+:root[data-color="lemon"][data-theme="dark"] {
+  --color-primary: #E0C349; --color-primary-dark: #F0DE8F;
+  --color-mint: #302A12; --color-mint-strong: #423918; --color-primary-contrast: #1C1704;
 }
