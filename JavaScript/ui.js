@@ -420,63 +420,111 @@
     else { input.checked = false; input.indeterminate = true; }
   }
 
-  /* ================= Word ================= */
+  /* ================= Word Card =================
+     article.word-card
+       header.word-card-head  → [checkbox] [word + POS] [difficulty]
+       p.word-meaning
+       div.word-extras        → only when the word has extras
+       footer.word-card-foot  → [known state text] [manual-review flag]
+     Presentation only: wordId, UX.isKnown / toggleKnown /
+     isManualReview / toggleManualReview are used exactly as before. */
+  function renderWordExtras(w) {
+    const keys = Object.keys(w.extras || {}).filter(function (k) { return k !== '_raw' && w.extras[k]; });
+    if (keys.length) {
+      const chips = h('div', { class: 'word-extras' });
+      keys.forEach(function (k) {
+        const isSyn = /syn/i.test(k);
+        chips.appendChild(h('span', { class: 'extra-chip' }, [
+          icon(isSyn ? 'lucide:plus-circle' : 'lucide:minus-circle', 'extra-chip-icon'),
+          h('span', { class: 'visually-hidden', text: k + ': ' }),
+          h('span', { class: 'extra-chip-text', text: w.extras[k] })
+        ]));
+      });
+      return chips;
+    }
+    if (w.extras && w.extras._raw && w.extras._raw.length) {
+      return h('div', { class: 'word-extras word-extras-raw', text: w.extras._raw.join(' · ') });
+    }
+    return null;
+  }
+
   function renderWord(w) {
-    const row = h('div', { class: 'word-row', 'data-word-id': w.wordId });
+    const card = h('article', { class: 'word-card ' + (w.status === 'easy' ? 'is-easy' : 'is-hard'), 'data-word-id': w.wordId });
 
     const cb = customCheckbox({
       checked: UX.isKnown(w.wordId),
       extraClass: 'word-cb',
       onchange: function () { UX.toggleKnown(w.wordId); }
     });
-    row.appendChild(cb);
+    cb._input.setAttribute('aria-label', 'حفظت الكلمة: ' + w.word);
 
-    const info = h('div', { class: 'word-info' });
-    const wordTopChildren = [h('span', { class: 'word-text', text: w.word })];
-    if (w.pos) wordTopChildren.push(h('span', { class: 'pos-badge', text: w.pos }));
-    wordTopChildren.push(h('span', {
-      class: 'diff-badge ' + (w.status === 'easy' ? 'diff-easy' : 'diff-hard')
-    }, [icon(w.status === 'easy' ? 'lucide:check-circle' : 'lucide:alert-triangle'), h('span', { text: w.status === 'easy' ? 'سهل' : 'صعب' })]));
-    info.appendChild(h('div', { class: 'word-top' }, wordTopChildren));
-    info.appendChild(h('div', { class: 'word-meaning', text: w.meaning }));
+    const identity = h('div', { class: 'word-identity' }, [h('span', { class: 'word-text', text: w.word })]);
+    if (w.pos) identity.appendChild(h('span', { class: 'pos-badge', text: w.pos }));
 
-    const extrasKeys = Object.keys(w.extras || {}).filter(function (k) { return k !== '_raw'; });
-    if (extrasKeys.length) {
-      const chips = h('div', { class: 'extras-row' });
-      extrasKeys.forEach(function (k) {
-        if (!w.extras[k]) return;
-        const isSyn = /syn/i.test(k);
-        chips.appendChild(h('span', { class: 'extra-chip' }, [
-          icon(isSyn ? 'lucide:plus-circle' : 'lucide:minus-circle', 'extra-chip-icon'),
-          h('span', { text: w.extras[k] })
-        ]));
-      });
-      if (chips.childNodes.length) info.appendChild(chips);
-    } else if (w.extras && w.extras._raw && w.extras._raw.length) {
-      info.appendChild(h('div', { class: 'word-extras-raw', text: w.extras._raw.join(' · ') }));
-    }
-    row.appendChild(info);
+    const easy = w.status === 'easy';
+    const diff = h('span', { class: 'diff-badge ' + (easy ? 'diff-easy' : 'diff-hard') }, [
+      icon(easy ? 'lucide:check-circle' : 'lucide:alert-triangle'),
+      h('span', { text: easy ? 'سهل' : 'صعب' })
+    ]);
+    card.appendChild(h('header', { class: 'word-card-head' }, [cb, identity, diff]));
+    card.appendChild(h('p', { class: 'word-meaning', text: w.meaning }));
 
-    row.appendChild(h('button', {
-      class: 'flag-btn' + (UX.isManualReview(w.wordId) ? ' active' : ''),
-      title: 'علّم للمراجعة',
+    const extras = renderWordExtras(w);
+    if (extras) card.appendChild(extras);
+
+    const stateIcon = h('span', { class: 'word-state-icon' });
+    const stateText = h('span', { class: 'word-state-text' });
+    const flagLabel = h('span', { class: 'flag-label' });
+    const flag = h('button', {
+      type: 'button',
+      class: 'flag-btn',
       onclick: function () { UX.toggleManualReview(w.wordId); }
-    }, [icon('lucide:flag')]));
+    }, [icon('lucide:flag'), flagLabel]);
+    card.appendChild(h('footer', { class: 'word-card-foot' }, [
+      h('span', { class: 'word-state' }, [stateIcon, stateText]),
+      flag
+    ]));
 
-    return row;
+    syncWordCard(card, w.wordId);
+    return card;
+  }
+
+  // Single place that maps UX state → card DOM (used on first render and
+  // on every live refresh, so the two can never drift apart).
+  function syncWordCard(card, id) {
+    const known = UX.isKnown(id);
+    const review = UX.isManualReview(id);
+    card.classList.toggle('is-known', known);
+    card.classList.toggle('is-review', review);
+
+    const cb = card.querySelector('.cb-input');
+    if (cb) cb.checked = known;
+
+    const stateIcon = card.querySelector('.word-state-icon');
+    if (stateIcon && stateIcon.dataset.known !== String(known)) {
+      stateIcon.dataset.known = String(known);
+      clear(stateIcon);
+      stateIcon.appendChild(icon(known ? 'lucide:check-circle' : 'lucide:minus-circle'));
+    }
+    const stateText = card.querySelector('.word-state-text');
+    if (stateText) stateText.textContent = known ? 'محفوظة' : 'غير محفوظة';
+
+    const flag = card.querySelector('.flag-btn');
+    if (flag) {
+      flag.classList.toggle('active', review);
+      flag.setAttribute('aria-label', review ? 'إلغاء تعليم الكلمة للمراجعة' : 'علّم الكلمة للمراجعة');
+      const label = flag.querySelector('.flag-label');
+      if (label) label.textContent = review ? 'للمراجعة' : 'مراجعة';
+    }
   }
 
   function refreshWordStates() {
-    document.querySelectorAll('.word-row').forEach(function (row) {
-      const id = row.dataset.wordId;
-      const cb = row.querySelector('.cb-input');
-      if (cb) cb.checked = UX.isKnown(id);
-      const flag = row.querySelector('.flag-btn');
-      if (flag) flag.classList.toggle('active', UX.isManualReview(id));
+    document.querySelectorAll('.word-card').forEach(function (card) {
+      syncWordCard(card, card.dataset.wordId);
     });
     document.querySelectorAll('.group').forEach(function (g) {
       const wordIds = [];
-      g.querySelectorAll('.word-row').forEach(function (r) { wordIds.push(r.dataset.wordId); });
+      g.querySelectorAll('.word-card').forEach(function (r) { wordIds.push(r.dataset.wordId); });
       const cb = g.querySelector('.group-cb .cb-input');
       if (cb) applyTriState(cb, UX.getGroupTriState(wordIds));
       const countEl = g.querySelector('.group-count');
