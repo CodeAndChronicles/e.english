@@ -1,0 +1,15 @@
+{
+  "name": "E.English",
+  "short_name": "E.English",
+  "description": "مذاكرة مفردات ومصطلحات ومرادفات اللغة الإنجليزية أونلاين وأوفلاين",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F8F7",
+  "theme_color": "#1FA971",
+  "icons": [
+    { "src": "Ui/Logo.png", "sizes": "any", "type": "image/png", "purpose": "any" }
+  ]
+}

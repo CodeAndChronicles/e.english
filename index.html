@@ -2,40 +2,64 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>E.English</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>E.English — تطبيق مذاكرة المفردات الإنجليزية</title>
+  <meta name="description" content="E.English: طبّق واذاكر مفردات ومصطلحات ومرادفات اللغة الإنجليزية أونلاين وأوفلاين، مع كويزات تفاعلية وتتبّع تقدّم لكل وحدة ودرس." />
+  <meta name="theme-color" content="#1FA971" id="meta-theme-color" />
   <link rel="icon" type="image/png" href="Ui/Logo.png" />
+  <link rel="apple-touch-icon" href="Ui/Logo.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+
+  <!-- Open Graph / social preview -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="E.English" />
+  <meta property="og:description" content="طبّق واذاكر مفردات ومصطلحات ومرادفات اللغة الإنجليزية أونلاين وأوفلاين، مع كويزات تفاعلية وتتبّع تقدّم لكل وحدة ودرس." />
+  <meta property="og:image" content="Ui/Logo.png" />
+  <meta property="og:locale" content="ar_AR" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="E.English" />
+  <meta name="twitter:description" content="مذاكرة مفردات إنجليزي أونلاين وأوفلاين، بكويزات وتتبّع تقدّم." />
+  <meta name="twitter:image" content="Ui/Logo.png" />
 
   <link rel="stylesheet" href="CSS/root.css" />
   <link rel="stylesheet" href="CSS/responsive.css" />
   <link rel="stylesheet" href="CSS/animations.css" />
   <link rel="stylesheet" href="CSS/settings.css" />
 
-  <!-- Iconify: unified icon system for the whole app (replaces raw emoji) -->
-  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+  <!-- Every icon in the app is a local, self-contained SVG (JavaScript/icons.js) —
+       no CDN / external network request is needed to render the UI. -->
 </head>
 <body>
   <div id="app">
     <button id="theme-toggle-btn" class="theme-toggle-btn" aria-label="تبديل الثيم">
-      <iconify-icon icon="lucide:moon" class="icon"></iconify-icon>
     </button>
-    <main id="screen-container"></main>
-    <nav id="bottom-nav" class="bottom-nav" hidden>
+    <nav id="side-nav" class="side-nav" hidden>
+      <img src="Ui/Logo.png" alt="" class="side-nav-logo" />
       <button class="nav-btn" data-nav="home">
-        <iconify-icon icon="lucide:home" class="icon"></iconify-icon>
         <span>Home</span>
       </button>
       <button class="nav-btn" data-nav="statistics">
-        <iconify-icon icon="lucide:bar-chart-2" class="icon"></iconify-icon>
         <span>Statistics</span>
       </button>
       <button class="nav-btn" data-nav="settings">
-        <iconify-icon icon="lucide:settings" class="icon"></iconify-icon>
+        <span>Settings</span>
+      </button>
+    </nav>
+    <main id="screen-container"></main>
+    <nav id="bottom-nav" class="bottom-nav" hidden>
+      <button class="nav-btn" data-nav="home">
+        <span>Home</span>
+      </button>
+      <button class="nav-btn" data-nav="statistics">
+        <span>Statistics</span>
+      </button>
+      <button class="nav-btn" data-nav="settings">
         <span>Settings</span>
       </button>
     </nav>
   </div>
 
+  <script src="JavaScript/icons.js"></script>
   <script src="JavaScript/ux.js"></script>
   <script src="JavaScript/ui.js"></script>
   <script src="JavaScript/settings.js"></script>
@@ -43,6 +67,11 @@
     document.addEventListener('DOMContentLoaded', function () {
       UI.init();
     });
+    if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
   </script>
 </body>
 </html>
