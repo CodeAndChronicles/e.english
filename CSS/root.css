@@ -44,7 +44,7 @@
   /* ---- Layout ---- */
   --nav-height: 64px;
   --content-max-width: 720px;
-  --side-nav-width: 236px;
+  --side-nav-width: 160px;
 
   /* ---- Motion ---- */
   --t-fast: 0.14s;
@@ -52,10 +52,11 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ---- Theme tokens: driven ONLY by data-theme, set by ui.js from
-   UX.getTheme()/localStorage — never by the OS/browser color-scheme
-   after the user has made an explicit choice. `:root` (no attribute)
-   below is just the pre-JS fallback for the first paint. ---- */
+/* ---- Theme tokens: driven ONLY by data-theme, set by ui.js from the
+   EFFECTIVE theme (UX.getTheme()). For the "system" preference, UX
+   resolves prefers-color-scheme in JS and re-emits on OS changes, so the
+   CSS never needs a media query. `:root` (no attribute) below is just the
+   pre-JS fallback for the first paint. ---- */
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
@@ -122,7 +123,7 @@
 }
 
 /* =====================================================================
-   Accent color themes — 4 "premium/Carbon-style" desaturated palettes,
+   Accent color themes — 8 "premium/Carbon-style" desaturated palettes,
    chosen from Settings, fully independent of light/dark. Only the accent
    tokens change here; every neutral (bg/surface/border/text) above stays
    the same regardless of which color is picked. Higher selector
@@ -178,6 +179,30 @@
 :root[data-color="purple"][data-theme="dark"] {
   --color-primary: #B698E0; --color-primary-dark: #D6C3F0;
   --color-mint: #241B34; --color-mint-strong: #322547; --color-primary-contrast: #130E1C;
+}
+
+/* ---- Teal (deep blue-green; sits between green and blue) ----
+   Contrast (WCAG): light — white on #177A80 = 5.1:1, dark — #04191B on
+   #4CC0C7 = 8.3:1; accent-as-text on the page surface stays >= 4.5:1. */
+:root[data-color="teal"][data-theme="light"] {
+  --color-primary: #177A80; --color-primary-dark: #0C4F54;
+  --color-mint: #E4F4F5; --color-mint-strong: #C2E5E7; --color-primary-contrast: #ffffff;
+}
+:root[data-color="teal"][data-theme="dark"] {
+  --color-primary: #4CC0C7; --color-primary-dark: #9BE2E6;
+  --color-mint: #0F2E31; --color-mint-strong: #164246; --color-primary-contrast: #04191B;
+}
+
+/* ---- Orange (burnt orange / clay; warmer and redder than Lemon) ----
+   Contrast (WCAG): light — white on #B4501A >= 4.5:1, dark — #1E0E03 on
+   #F0975E = 8.3:1. */
+:root[data-color="orange"][data-theme="light"] {
+  --color-primary: #B4501A; --color-primary-dark: #7A360F;
+  --color-mint: #FBEEE4; --color-mint-strong: #F4D9C5; --color-primary-contrast: #ffffff;
+}
+:root[data-color="orange"][data-theme="dark"] {
+  --color-primary: #F0975E; --color-primary-dark: #F7C4A0;
+  --color-mint: #35200F; --color-mint-strong: #4A2E17; --color-primary-contrast: #1E0E03;
 }
 
 /* ---- Lemon (warm, desaturated yellow-gold accent) ---- */

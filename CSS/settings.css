@@ -24,7 +24,7 @@
 .settings-row-title { font-weight: var(--fw-medium); }
 .settings-row-sub { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px; }
 
-/* ---- Light/Dark segmented control ---- */
+/* ---- Light / Dark / System segmented control ---- */
 .segmented {
   display: inline-flex; background: var(--color-surface-alt);
   border-radius: var(--r-pill); padding: 3px; flex-shrink: 0;
@@ -35,6 +35,15 @@
   color: var(--color-text-muted);
 }
 .segmented-btn.active { background: var(--color-primary); color: var(--color-primary-contrast); }
+.segmented-btn { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.segmented-icon { font-size: 16px; }
+.segmented-sub { font-family: var(--font-en); font-size: 10px; font-weight: var(--fw-regular); opacity: 0.8; line-height: 1.2; }
+.segmented-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* Full-width variant: three equal buttons under the row title. */
+.settings-row-flush { border-bottom: none; padding-bottom: var(--sp-sm); }
+.settings-seg-wrap { padding-bottom: var(--sp-md); border-bottom: 1px solid var(--color-border); }
+.segmented-full { display: flex; width: 100%; max-width: 440px; }
+.segmented-full .segmented-btn { flex: 1; min-width: 0; padding: var(--sp-xs) var(--sp-xs); white-space: nowrap; }
 
 /* ---- Theme color grid ---- */
 .theme-color-grid {
@@ -56,6 +65,8 @@
 .swatch-red { background: #B23A48; }
 .swatch-purple { background: #7A4FB0; }
 .swatch-lemon { background: #C9A421; }
+.swatch-teal { background: #177A80; }
+.swatch-orange { background: #B4501A; }
 .swatch-label { font-size: var(--font-size-sm); }
 
 /* ---- Toggle switch (keep screen awake) ---- */
@@ -92,9 +103,31 @@
 .settings-toast.show { opacity: 1; transform: translate(-50%, 0); }
 .settings-toast-warn { background: var(--color-review); color: #1B2521; }
 
-@media (min-width: 480px) {
-  .theme-color-grid { grid-template-columns: repeat(3, 1fr); }
+/* 8 accents: 2 columns on phones, 4 on wider screens (two even rows). */
+@media (min-width: 600px) {
+  .theme-color-grid { grid-template-columns: repeat(4, 1fr); }
+  .theme-color-swatch { padding-inline: var(--sp-sm); }
 }
+
+/* ---- Advanced: collapsed disclosure ---- */
+.advanced-toggle {
+  display: flex; align-items: center; gap: var(--sp-sm);
+  width: 100%; padding: var(--sp-sm) var(--sp-lg);
+  margin-bottom: var(--sp-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  font-weight: var(--fw-bold); font-size: var(--font-size-md);
+}
+.advanced-toggle:hover { background: var(--color-surface-alt); }
+.advanced-toggle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.advanced-toggle-icon { color: var(--color-review); }
+.advanced-toggle-label { flex: 1; text-align: start; }
+.advanced-chevron { color: var(--color-text-muted); transform: rotate(-90deg); }
+.advanced-toggle.open { margin-bottom: var(--sp-sm); }
+.advanced-toggle.open .advanced-chevron { transform: rotate(0deg); }
+.advanced-panel[hidden] { display: none; }
 
 /* ---- Advanced: device info ---- */
 .device-info-head { display: flex; align-items: center; gap: var(--sp-xs); padding: var(--sp-md) 0 var(--sp-xs); }

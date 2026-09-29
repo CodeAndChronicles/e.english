@@ -194,8 +194,13 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .cb-input:indeterminate ~ .cb-box .cb-icon-indeterminate { display: block; }
 
 /* ---------- Collapsible groups ---------- */
-.groups-wrap { display: flex; flex-direction: column; gap: var(--sp-sm); }
+/* The GROUP is the layout unit. Mobile: one group per row. Desktop
+   (>= 1024px, see the breakpoint below): a responsive grid of groups
+   side by side. Word cards never join the page-level grid — they only
+   ever arrange themselves inside their own group. */
+.groups-wrap { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-sm); }
 .group {
+  container-type: inline-size; container-name: group;
   border: 1px solid var(--color-border);
   border-radius: var(--r-md);
   overflow: hidden;
@@ -213,6 +218,36 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .group.open .group-chevron { transform: rotate(0deg); }
 .group-body { display: none; flex-direction: column; }
 .group.open .group-body { display: flex; }
+
+/* Inside a group that is wide enough (>= 340px), its word cards flow in up
+   to three compact columns (a 6-word group reads 3 + 3). Driven by the GROUP's own
+   width (container query), so it adapts the same way on a tablet or in a
+   desktop grid cell, and stays a single column on phones. */
+/* Tablet/desktop only — phones keep the original single-column word card. */
+@media (min-width: 640px) {
+  @container group (min-width: 340px) {
+    .group.open .group-body {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(max(148px, calc((100% - 2 * var(--sp-xs)) / 3)), 1fr));
+      gap: var(--sp-xs);
+      padding: var(--sp-sm);
+    }
+    .group .group-body .word-card { margin: 0; padding: var(--sp-xs) var(--sp-sm); gap: 2px; }
+    .group .group-body .word-card-head {
+      display: grid; grid-template-columns: auto 1fr; align-items: center;
+      column-gap: var(--sp-xs); row-gap: 2px;
+    }
+    .group .group-body .word-cb { grid-area: 1 / 1; }
+    .group .group-body .diff-badge { grid-area: 1 / 2; justify-self: end; }
+    .group .group-body .word-identity { grid-area: 2 / 1 / 3 / 3; }
+    .group .group-body .word-text { font-size: clamp(18px, 1.2vw + 8px, 22px); }
+    .group .group-body .word-meaning { font-size: var(--font-size-sm); line-height: 1.6; }
+    .group .group-body .word-card-foot { gap: 4px; }
+    .group .group-body .word-state { gap: 4px; font-size: 11px; white-space: nowrap; }
+    .group .group-body .flag-label { display: none; }
+    .group .group-body .flag-btn { min-width: 32px; min-height: 32px; justify-content: center; padding: 0; }
+  }
+}
 
 /* ---------- Word card ----------
    Hierarchy: word (hero) → POS → meaning → extras → footer actions.
@@ -354,6 +389,12 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 /* ---------- Statistics ---------- */
 .stats-cards-grid { display: flex; flex-direction: column; gap: var(--sp-md); margin-bottom: var(--sp-lg); }
 .stats-card { margin-bottom: 0; }
+
+/* ---------- Info ---------- */
+.info-card { text-align: center; padding: var(--sp-xl) var(--sp-lg); }
+.info-credit { margin: 0; font-size: var(--font-size-lg); font-weight: var(--fw-medium); unicode-bidi: isolate; }
+.info-label { font-family: var(--font-en); color: var(--color-text-muted); }
+.info-names { unicode-bidi: isolate; }
 .stats-row { display: flex; justify-content: space-between; padding: var(--sp-xs) 0; gap: var(--sp-sm); }
 .stats-value { font-weight: var(--fw-bold); flex-shrink: 0; }
 .progress-bar { width: 100%; height: 10px; background: var(--color-surface-alt); border-radius: var(--r-pill); overflow: hidden; margin: var(--sp-sm) 0; }
@@ -437,21 +478,22 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
   top: 0; bottom: 0;
   width: var(--side-nav-width);
   flex-direction: column;
-  gap: var(--sp-2xs);
-  padding: var(--sp-lg) var(--sp-md);
+  gap: 2px;
+  padding: var(--sp-md) var(--sp-xs);
   background: var(--color-surface);
   border-inline-start: 1px solid var(--color-border);
   z-index: 150;
   overflow-y: auto;
 }
-.side-nav-logo { height: 40px; width: auto; border-radius: var(--r-sm); margin: 0 0 var(--sp-lg) var(--sp-xs); align-self: flex-start; }
+.side-nav-logo { height: 30px; width: auto; border-radius: var(--r-sm); margin: 0 var(--sp-sm) var(--sp-md); align-self: flex-start; }
 .side-nav .nav-btn {
-  flex-direction: row; justify-content: flex-start; gap: var(--sp-sm);
-  width: 100%; padding: var(--sp-sm) var(--sp-md);
+  flex: 0 0 auto; /* the shared .nav-btn has flex:1 for the bottom bar — in the rail that stretched every item */
+  flex-direction: row; justify-content: flex-start; gap: var(--sp-xs);
+  width: 100%; padding: var(--sp-xs) var(--sp-sm);
   border-radius: var(--r-md);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-sm);
 }
-.side-nav .nav-btn .icon { width: 22px; height: 22px; font-size: 22px; }
+.side-nav .nav-btn .icon { width: 20px; height: 20px; font-size: 20px; }
 .side-nav .nav-btn:hover { background: var(--color-surface-alt); }
 .side-nav .nav-btn.active { background: var(--color-mint); color: var(--color-primary); font-weight: var(--fw-medium); }
 
@@ -464,16 +506,14 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
 .sk-group { height: 120px; }
 
 /* ================= Responsive breakpoints ================= */
-@media (min-width: 480px) {
-  .theme-color-grid { grid-template-columns: repeat(3, 1fr); }
-}
 @media (min-width: 640px) {
   #screen-container { padding: var(--sp-lg); }
   .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-md); }
   .stats-cards-grid { display: grid; grid-template-columns: 1fr 1fr; }
+  .stats-card-overall { grid-column: 1 / -1; }
 }
 @media (min-width: 1024px) {
-  :root { --content-max-width: 960px; }
+  :root { --content-max-width: 1000px; }
 
   /* App-shell layout: side rail instead of the phone's bottom nav — the
      rail is fixed to the edge, and #app reserves that width so the
@@ -484,11 +524,15 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
   #screen-container { padding: var(--sp-xl) var(--sp-xl); padding-bottom: var(--sp-xl); }
 
   .card-grid { grid-template-columns: 1fr 1fr 1fr; }
-  .sections-wrap { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: var(--sp-lg); }
+  /* Sections stack full width; the GROUP grid lives inside each section. */
+  .groups-wrap { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--sp-md); }
+  .quiz-launch-row .btn { flex: 0 1 240px; }
+  /* The side rail already shows the logo — don't repeat it in the header. */
+  .app-header .app-logo { display: none; }
   .review-list, .quiz-history-list { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-sm); }
 }
 @media (min-width: 1280px) {
-  :root { --content-max-width: 1120px; }
+  :root { --content-max-width: 1180px; }
   .card-grid { grid-template-columns: repeat(4, 1fr); }
 }
 @media (max-width: 400px) {
