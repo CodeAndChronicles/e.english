@@ -31,7 +31,11 @@
   }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
-  const COLOR_LABELS = { green: 'أخضر', blue: 'أزرق', gray: 'رمادي', red: 'أحمر', purple: 'بنفسجي', lemon: 'ليموني' };
+  const COLOR_LABELS = { green: 'أخضر', blue: 'أزرق', gray: 'رمادي', red: 'أحمر', purple: 'بنفسجي', lemon: 'ليموني', teal: 'فيروزي', orange: 'برتقالي' };
+
+  // Advanced is collapsed every time Settings is opened from the nav; it only
+  // stays open across the re-render that follows a successful import.
+  let advancedOpen = false;
 
   /* ---------------- Wake Lock (keep screen on) ----------------
      Best-effort only: unsupported browsers just keep the toggle off and
@@ -95,11 +99,18 @@
       const btn = h('button', {
         class: 'segmented-btn' + (opt.value === activeValue ? ' active' : ''),
         onclick: function () {
-          wrap.querySelectorAll('.segmented-btn').forEach(function (b) { b.classList.remove('active'); });
+          wrap.querySelectorAll('.segmented-btn').forEach(function (b) { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });
           btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
           onChange(opt.value);
         }
-      }, [h('span', { text: opt.label })]);
+      }, [
+        opt.icon ? icon(opt.icon, 'segmented-icon') : null,
+        h('span', { class: 'segmented-label', text: opt.label }),
+        opt.sub ? h('span', { class: 'segmented-sub', text: opt.sub }) : null
+      ]);
+      btn.setAttribute('aria-pressed', opt.value === activeValue ? 'true' : 'false');
+      if (opt.title) btn.setAttribute('title', opt.title);
       wrap.appendChild(btn);
     });
     return wrap;
@@ -113,7 +124,8 @@
   }
 
   /* ================= Settings screen ================= */
-  function render() {
+  function render(opts) {
+    if (!(opts && opts.keepAdvanced)) advancedOpen = false;
     const screen = document.getElementById('screen-container');
     if (!screen) return;
     clear(screen);
@@ -122,17 +134,34 @@
     screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'الإعدادات' })]));
 
     /* ---- Appearance ---- */
-    screen.appendChild(h('h2', { class: 'section-title-flat' }, [icon('lucide:palette'), h('span', { text: 'المظهر' })]));
+    screen.appendChild(h('h2', { class: 'section-title-flat' }, [icon('palette'), h('span', { text: 'المظهر' })]));
     const appearanceCard = h('div', { class: 'card settings-card' });
 
-    appearanceCard.appendChild(settingsRow('lucide:sun-moon', 'وضع الإضاءة', 'فاتح أو غامق', segmented(
-      [{ value: 'light', label: 'فاتح' }, { value: 'dark', label: 'غامق' }],
-      UX.getTheme(),
+    const themeRow = h('div', { class: 'settings-row settings-row-block' }, [
+      h('span', { class: 'settings-row-icon' }, [icon('sun-moon')]),
+      h('div', { class: 'settings-row-text' }, [
+        h('div', { class: 'settings-row-title', text: 'وضع الإضاءة' }),
+        h('div', { class: 'settings-row-sub', text: 'فاتح أو غامق أو حسب نظام جهازك' })
+      ])
+    ]);
+    themeRow.classList.add('settings-row-flush');
+    appearanceCard.appendChild(themeRow);
+    const themeSeg = segmented(
+      [
+        { value: 'light', label: 'فاتح', sub: 'Light', icon: 'sun', title: 'Light / فاتح' },
+        { value: 'dark', label: 'غامق', sub: 'Dark', icon: 'moon', title: 'Dark / غامق' },
+        { value: 'system', label: 'حسب النظام', sub: 'System', icon: 'monitor', title: 'System / حسب النظام' }
+      ],
+      UX.getThemePreference(),
       function (val) { UX.setTheme(val); }
-    )));
+    );
+    themeSeg.classList.add('segmented-full');
+    themeSeg.setAttribute('role', 'group');
+    themeSeg.setAttribute('aria-label', 'وضع الإضاءة');
+    appearanceCard.appendChild(h('div', { class: 'settings-seg-wrap' }, [themeSeg]));
 
     const colorRow = h('div', { class: 'settings-row settings-row-block' }, [
-      h('span', { class: 'settings-row-icon' }, [icon('lucide:swatch-book')]),
+      h('span', { class: 'settings-row-icon' }, [icon('swatch-book')]),
       h('div', { class: 'settings-row-text' }, [
         h('div', { class: 'settings-row-title', text: 'لون الواجهة' }),
         h('div', { class: 'settings-row-sub', text: 'اختار الثيم اللي يعجبك' })
@@ -157,7 +186,7 @@
     });
     appearanceCard.appendChild(colorGrid);
 
-    appearanceCard.appendChild(settingsRow('lucide:battery-charging', 'خلي الشاشة شغالة', 'يمنع إطفاء الشاشة أثناء استخدام الموقع', toggleSwitch(
+    appearanceCard.appendChild(settingsRow('lightbulb', 'خلي الشاشة شغالة', 'يمنع إطفاء الشاشة أثناء استخدام الموقع', toggleSwitch(
       UX.getKeepAwake(),
       function (checked) {
         UX.setKeepAwake(checked);
@@ -172,8 +201,30 @@
     )));
     screen.appendChild(appearanceCard);
 
+    /* ---- Advanced (collapsed by default) ---- */
+    const advancedPanel = h('div', { class: 'advanced-panel', id: 'advanced-panel' });
+    advancedPanel.hidden = !advancedOpen;
+    const advancedToggle = h('button', {
+      type: 'button',
+      class: 'advanced-toggle' + (advancedOpen ? ' open' : ''),
+      'aria-expanded': advancedOpen ? 'true' : 'false',
+      'aria-controls': 'advanced-panel',
+      onclick: function () {
+        advancedOpen = !advancedOpen;
+        advancedPanel.hidden = !advancedOpen;
+        advancedToggle.classList.toggle('open', advancedOpen);
+        advancedToggle.setAttribute('aria-expanded', advancedOpen ? 'true' : 'false');
+        if (advancedOpen) fillStorageRow();
+      }
+    }, [
+      icon('sliders-horizontal', 'advanced-toggle-icon'),
+      h('span', { class: 'advanced-toggle-label', text: 'Advanced · متقدم' }),
+      icon('chevron-left', 'advanced-chevron')
+    ]);
+    screen.appendChild(advancedToggle);
+    screen.appendChild(advancedPanel);
+
     /* ---- Data ---- */
-    screen.appendChild(h('h2', { class: 'section-title-flat' }, [icon('database'), h('span', { text: 'Advanced · متقدم' })]));
     const dataCard = h('div', { class: 'card settings-card' });
 
     dataCard.appendChild(h('button', {
@@ -184,7 +235,7 @@
         downloadJSON(data, 'eenglish-backup-' + stamp + '.json');
         showToast('اتصدرت نسخة من بياناتك ✅', 'ok');
       }
-    }, [icon('lucide:download'), h('span', { text: 'استخراج نسخة من بياناتي' })]));
+    }, [icon('download'), h('span', { text: 'استخراج نسخة من بياناتي' })]));
 
     const importInput = h('input', { type: 'file', accept: 'application/json', class: 'visually-hidden' });
     importInput.addEventListener('change', function () {
@@ -199,7 +250,7 @@
         }
         if (parsed && UX.importAllData(parsed)) {
           showToast('اتستوردت البيانات بنجاح ✅', 'ok');
-          render();
+          render({ keepAdvanced: true });
         } else {
           showToast('الملف ده مش نسخة بيانات صحيحة ❌', 'warn');
         }
@@ -211,7 +262,7 @@
     dataCard.appendChild(h('button', {
       class: 'btn btn-secondary settings-action-btn',
       onclick: function () { importInput.click(); }
-    }, [icon('lucide:upload'), h('span', { text: 'استيراد نسخة بيانات' })]));
+    }, [icon('upload'), h('span', { text: 'استيراد نسخة بيانات' })]));
 
     dataCard.appendChild(h('button', {
       class: 'btn btn-danger settings-action-btn',
@@ -222,15 +273,15 @@
           global.location.reload();
         }
       }
-    }, [icon('lucide:trash-2'), h('span', { text: 'حذف كل البيانات' })]));
-    screen.appendChild(dataCard);
+    }, [icon('trash-2'), h('span', { text: 'حذف كل البيانات' })]));
+    advancedPanel.appendChild(dataCard);
 
     /* ---- Advanced: device / browser capabilities ----
        Every value comes straight from a browser API — nothing here is
        guessed or computed indirectly. If the API isn't exposed by this
        browser, the row shows "N/A" instead of a fabricated number. */
     const deviceCard = h('div', { class: 'card settings-card device-info-card' });
-    deviceCard.appendChild(h('div', { class: 'settings-row-title device-info-head' }, [icon('cpu'), h('span', { text: 'الجهاز والمتصفح' })]));
+    deviceCard.appendChild(h('div', { class: 'settings-row-title device-info-head' }, [icon('monitor-smartphone'), h('span', { text: 'الجهاز والمتصفح' })]));
 
     function infoRow(label, value) {
       return h('div', { class: 'device-info-row' }, [
@@ -251,7 +302,7 @@
     const storageRow = infoRow('مساحة التخزين المستخدمة', 'جارٍ الحساب...');
     rowsWrap.appendChild(storageRow);
     deviceCard.appendChild(rowsWrap);
-    screen.appendChild(deviceCard);
+    advancedPanel.appendChild(deviceCard);
 
     function formatBytes(n) {
       if (typeof n !== 'number' || !isFinite(n)) return 'N/A';
@@ -261,21 +312,24 @@
       do { v /= 1024; i++; } while (v >= 1024 && i < units.length - 1);
       return v.toFixed(1) + ' ' + units[i];
     }
-    if (nav.storage && typeof nav.storage.estimate === 'function') {
-      nav.storage.estimate().then(function (est) {
-        const valueEl = storageRow.querySelector('.device-info-value');
-        if (!valueEl) return;
-        const used = formatBytes(est && est.usage);
-        const quota = formatBytes(est && est.quota);
-        valueEl.textContent = (used === 'N/A' || quota === 'N/A') ? 'N/A' : (used + ' / ' + quota);
-      }).catch(function () {
-        const valueEl = storageRow.querySelector('.device-info-value');
-        if (valueEl) valueEl.textContent = 'N/A';
-      });
-    } else {
+    // Storage estimate is only computed the first time Advanced is opened.
+    let storageFilled = false;
+    function fillStorageRow() {
+      if (storageFilled) return;
+      storageFilled = true;
       const valueEl = storageRow.querySelector('.device-info-value');
-      if (valueEl) valueEl.textContent = 'N/A';
+      if (!valueEl) return;
+      if (nav.storage && typeof nav.storage.estimate === 'function') {
+        nav.storage.estimate().then(function (est) {
+          const used = formatBytes(est && est.usage);
+          const quota = formatBytes(est && est.quota);
+          valueEl.textContent = (used === 'N/A' || quota === 'N/A') ? 'N/A' : (used + ' / ' + quota);
+        }).catch(function () { valueEl.textContent = 'N/A'; });
+      } else {
+        valueEl.textContent = 'N/A';
+      }
     }
+    if (advancedOpen) fillStorageRow();
   }
 
   global.UI = global.UI || {};

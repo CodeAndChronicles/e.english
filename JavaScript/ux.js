@@ -29,7 +29,8 @@
     themeColor: 'eenglish.themeColor',
     keepAwake: 'eenglish.keepAwake'
   };
-  const THEME_COLORS = ['green', 'blue', 'gray', 'red', 'purple', 'lemon'];
+  const THEME_COLORS = ['green', 'blue', 'gray', 'red', 'purple', 'lemon', 'teal', 'orange'];
+  const THEME_PREFS = ['light', 'dark', 'system'];
 
   function readLS(key, fallback) {
     try {
@@ -42,6 +43,77 @@
   }
   function writeLS(key, val) {
     try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+
+  /* ---------------- App version / cache migration ----------------
+     Two storage worlds, kept strictly apart:
+
+       APP layer  (safe to invalidate)   Cache Storage entries named
+                                         "e-english-*" + ONE small marker
+                                         key, 'eenglish.app'.
+       USER layer (never touched here)   everything in LS_KEYS below:
+                                         known words, manual/auto review,
+                                         quiz history, theme, accent, ...
+
+     The marker is deliberately NOT in LS_KEYS, so export/import/"delete
+     all data" never see it, and this section never reads or writes any
+     LS_KEYS entry. There is no clear-all anywhere: cleanup is limited to
+     Cache Storage entries with our own prefix.
+
+     On startup, if the stored version differs from EE_MODEL_VERSION
+     (JavaScript/version.js) — in ANY direction, 5→6, 6→7 or 8→6 — the old
+     app caches are dropped and the marker is updated. The current
+     version's cache (if present) keeps its app shell but loses its cached
+     lesson content, so content is always re-fetched fresh after a change. */
+  const APP_META_KEY = 'eenglish.app';
+  const CURRENT_VERSION = String(global.EE_MODEL_VERSION || '');
+  const CACHE_PREFIX = global.EE_CACHE_PREFIX || 'e-english-';
+  const CACHE_NAME = global.EE_CACHE_NAME || (CACHE_PREFIX + 'v' + CURRENT_VERSION);
+  const versionInfo = { current: CURRENT_VERSION, previous: null, changed: false };
+
+  function readAppMeta() {
+    const m = readLS(APP_META_KEY, null);
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return { version: null, history: [] };
+    return {
+      version: typeof m.version === 'string' ? m.version : null,
+      history: Array.isArray(m.history) ? m.history.slice(-10) : []
+    };
+  }
+  function isContentRequest(req) {
+    let path = '';
+    try { path = new URL(req.url).pathname; } catch (e) { return false; }
+    return path.indexOf('/Files/') !== -1 || /\/app\.json$/.test(path);
+  }
+  function invalidateAppCaches() {
+    if (!global.caches || !global.caches.keys) return Promise.resolve();
+    return global.caches.keys().then(function (keys) {
+      return Promise.all(keys.filter(function (k) { return k.indexOf(CACHE_PREFIX) === 0; }).map(function (k) {
+        if (k !== CACHE_NAME) return global.caches.delete(k); // another version's cache: gone
+        return global.caches.open(k).then(function (cache) { // same-named cache: drop only its content entries
+          return cache.keys().then(function (reqs) {
+            return Promise.all(reqs.filter(isContentRequest).map(function (r) { return cache.delete(r); }));
+          });
+        });
+      }));
+    }).catch(function () {});
+  }
+  // Resolves true when the version changed (caches were invalidated).
+  function migrateAppVersion() {
+    if (!CURRENT_VERSION) return Promise.resolve(false);
+    const meta = readAppMeta();
+    versionInfo.previous = meta.version;
+    if (meta.version === CURRENT_VERSION) return Promise.resolve(false);
+    return invalidateAppCaches().then(function () {
+      // Only real transitions are recorded. A missing marker means either a
+      // first run or an app older than versioning — the previous version is
+      // unknown, so nothing is invented for it.
+      const history = meta.version !== null
+        ? meta.history.concat([{ from: meta.version, to: CURRENT_VERSION, at: Date.now() }]).slice(-10)
+        : meta.history;
+      writeLS(APP_META_KEY, { version: CURRENT_VERSION, history: history });
+      versionInfo.changed = true;
+      return true;
+    });
   }
 
   /* ---------------- State ---------------- */
@@ -60,7 +132,8 @@
     // just silently omitting it (parsed from the filename itself, which
     // doesn't require the fetch to have succeeded).
     missingSections: [],
-    theme: readLS(LS_KEYS.theme, null), // null = no explicit user choice yet
+    freshLoad: false, // true for the load right after a version change → bypass the HTTP cache
+    theme: readLS(LS_KEYS.theme, null), // 'light' | 'dark' | 'system' | null (null behaves as 'system')
     themeColor: readLS(LS_KEYS.themeColor, 'green'),
     keepAwake: readLS(LS_KEYS.keepAwake, false)
   };
@@ -315,6 +388,7 @@
       else setTimeout(resolve, LOAD_BATCH_DELAY_MS);
     });
   }
+  function fetchOpts() { return state.freshLoad ? { cache: 'reload' } : undefined; }
   function fetchFilesThrottled(files) {
     const results = [];
     let i = 0;
@@ -323,7 +397,7 @@
       i += LOAD_BATCH_SIZE;
       if (!batch.length) return Promise.resolve(results);
       const tasks = batch.map(function (fname) {
-        return fetch('Files/' + fname)
+        return fetch('Files/' + fname, fetchOpts())
           .then(function (res) {
             if (!res.ok) throw new Error('missing');
             return res.text().then(function (txt) { return { fname: fname, text: txt }; });
@@ -345,10 +419,16 @@
     return nextBatch();
   }
 
-  // Removes localStorage entries for words that no longer exist in the
-  // currently-loaded content (renamed/deleted words, or anything left
-  // over from an old wordId scheme) — "نظّف تلقائيًا أي بيانات قديمة".
-  function cleanupStaleWordData() {
+  // Removes saved progress for words that don't exist in the currently
+  // loaded content. NOT called automatically any more: pruning at startup
+  // meant that opening a build with different content (a rollback such as
+  // 7 → 6, a file that failed to load, an imported backup) could silently
+  // erase real progress. Orphaned ids are harmless — every statistic and
+  // screen only looks at words that exist — so they are now kept until a
+  // caller explicitly asks for a prune, and even then only after a
+  // complete, error-free content load.
+  function pruneOrphanedProgress() {
+    if (!state.contentComplete || !state.units.length) return false;
     const validIds = {};
     state.units.forEach(function (unit) {
       unit.lessons.forEach(function (lesson) {
@@ -366,6 +446,7 @@
     if (changedKnown) writeLS(LS_KEYS.known, state.known);
     if (changedManual) writeLS(LS_KEYS.manualReview, state.manualReview);
     if (changedAuto) writeLS(LS_KEYS.autoReview, state.autoReview);
+    return changedKnown || changedManual || changedAuto;
   }
 
   function loadAll() {
@@ -378,7 +459,13 @@
     }
 
     state.missingSections = [];
-    return fetch('app.json')
+    state.contentComplete = false;
+    // Version check FIRST: stale app/content caches must be gone before any
+    // content is requested. User data is not touched by this step.
+    return migrateAppVersion().then(function (changed) {
+      state.freshLoad = changed;
+      return fetch('app.json', fetchOpts());
+    })
       .then(function (r) {
         if (!r.ok) throw new Error('app.json not found');
         return r.json();
@@ -389,10 +476,12 @@
       })
       .then(function (results) {
         const docs = [];
+        let allParsed = true;
         results.forEach(function (r) {
-          if (!r) return;
+          if (!r) { allParsed = false; return; }
           const meta = parseFilename(r.fname);
           if (!meta) {
+            allParsed = false;
             console.warn('[Warning] Filename does not match pattern U{n}-L{n}(-{n})?.md:\n' + r.fname);
             return;
           }
@@ -404,7 +493,8 @@
         });
         state.units = buildUnits(docs);
         buildSearchIndex();
-        cleanupStaleWordData();
+        state.contentComplete = allParsed && docs.length > 0;
+        state.freshLoad = false;
         emit('content-ready', { units: state.units });
       })
       .catch(function (err) {
@@ -719,6 +809,9 @@
   function getStatistics() {
     let vocabTotal = 0, vocabKnown = 0;
     let overallTotal = 0, overallKnown = 0;
+    // Per content type (vocabulary, synonyms_antonyms, idioms, derivatives,
+    // and any future/unknown type): { total, known, progress }.
+    const byType = {};
     const reviewWords = [];
     state.units.forEach(function (unit) {
       unit.lessons.forEach(function (lesson) {
@@ -726,7 +819,9 @@
           section.groups.forEach(function (group, gi) {
             group.words.forEach(function (w) {
               overallTotal++;
-              if (state.known[w.wordId]) overallKnown++;
+              if (!byType[section.type]) byType[section.type] = { total: 0, known: 0, progress: 0 };
+              byType[section.type].total++;
+              if (state.known[w.wordId]) { overallKnown++; byType[section.type].known++; }
               if (section.type === 'vocabulary') {
                 vocabTotal++;
                 if (state.known[w.wordId]) vocabKnown++;
@@ -743,8 +838,12 @@
         });
       });
     });
+    Object.keys(byType).forEach(function (t) {
+      byType[t].progress = byType[t].total > 0 ? byType[t].known / byType[t].total : 0;
+    });
     const recent = state.quizHistory.slice(-10).reverse();
     return {
+      byType: byType,
       vocabulary: { total: vocabTotal, known: vocabKnown, progress: vocabTotal > 0 ? vocabKnown / vocabTotal : 0 },
       overall: { total: overallTotal, known: overallKnown, progress: overallTotal > 0 ? overallKnown / overallTotal : 0 },
       reviewWords: reviewWords,
@@ -760,25 +859,42 @@
     return { total: words.length, known: known, progress: words.length > 0 ? known / words.length : 0 };
   }
 
-  /* ---------------- Theme ---------------- */
+  /* ---------------- Theme ----------------
+     Three persisted preferences: 'light' | 'dark' | 'system'.
+       getThemePreference() → what the user picked (default 'system')
+       getTheme()           → the EFFECTIVE 'light' | 'dark' right now
+                              (existing callers keep working unchanged)
+       setTheme(pref)       → accepts all three values
+     With 'system' the effective theme follows prefers-color-scheme and
+     updates live when the OS/browser theme changes. */
+  function systemPrefersDark() {
+    try { return !!(global.matchMedia && global.matchMedia('(prefers-color-scheme: dark)').matches); } catch (e) { return false; }
+  }
+  function getThemePreference() {
+    return THEME_PREFS.indexOf(state.theme) !== -1 ? state.theme : 'system';
+  }
   function getTheme() {
-    if (state.theme === 'light' || state.theme === 'dark') return state.theme;
-    // No explicit choice yet — fall back to the system preference just as
-    // an initial default; from the first setTheme() call onward this is
-    // fully user-controlled and persisted, never re-derived from the OS.
+    const pref = getThemePreference();
+    if (pref === 'system') return systemPrefersDark() ? 'dark' : 'light';
+    return pref;
+  }
+  function setTheme(pref) {
+    if (THEME_PREFS.indexOf(pref) === -1) return;
+    state.theme = pref;
+    writeLS(LS_KEYS.theme, pref);
+    emit('theme-preference-changed', pref);
+    emit('theme-changed', getTheme());
+  }
+  (function watchSystemTheme() {
     try {
-      if (global.matchMedia && global.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+      const mq = global.matchMedia('(prefers-color-scheme: dark)');
+      const onChange = function () { if (getThemePreference() === 'system') emit('theme-changed', getTheme()); };
+      if (mq.addEventListener) mq.addEventListener('change', onChange);
+      else if (mq.addListener) mq.addListener(onChange);
     } catch (e) {}
-    return 'light';
-  }
-  function setTheme(theme) {
-    if (theme !== 'light' && theme !== 'dark') return;
-    state.theme = theme;
-    writeLS(LS_KEYS.theme, theme);
-    emit('theme-changed', theme);
-  }
+  })();
 
-  /* ---------------- Theme color (Settings: 4 premium accents) ---------------- */
+  /* ---------------- Theme color (Settings: 8 accents) ---------------- */
   function getThemeColor() {
     return THEME_COLORS.indexOf(state.themeColor) !== -1 ? state.themeColor : 'green';
   }
@@ -811,30 +927,39 @@
      "استخراج / استيراد / حذف كل البيانات" buttons. */
   function exportAllData() {
     return {
-      appVersion: 1,
+      appVersion: 1,               // backup FORMAT version (unchanged)
+      modelVersion: CURRENT_VERSION, // app model version that wrote it (informational; never blocks an import)
       exportedAt: Date.now(),
       known: state.known,
       manualReview: state.manualReview,
       autoReview: state.autoReview,
       quizHistory: state.quizHistory,
-      theme: state.theme,
-      themeColor: state.themeColor,
+      theme: getThemePreference(),
+      themeColor: getThemeColor(),
       keepAwake: state.keepAwake
     };
   }
+  function isPlainObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
   function importAllData(obj) {
     if (!obj || typeof obj !== 'object') return false;
     const recognized = ['known', 'manualReview', 'autoReview', 'quizHistory', 'theme', 'themeColor', 'keepAwake'];
     if (!recognized.some(function (k) { return obj[k] !== undefined; })) return false;
     try {
-      if (obj.known && typeof obj.known === 'object') { state.known = obj.known; writeLS(LS_KEYS.known, state.known); }
-      if (obj.manualReview && typeof obj.manualReview === 'object') { state.manualReview = obj.manualReview; writeLS(LS_KEYS.manualReview, state.manualReview); }
-      if (obj.autoReview && typeof obj.autoReview === 'object') { state.autoReview = obj.autoReview; writeLS(LS_KEYS.autoReview, state.autoReview); }
-      if (Array.isArray(obj.quizHistory)) { state.quizHistory = obj.quizHistory.slice(-40); writeLS(LS_KEYS.quizHistory, state.quizHistory); }
-      if (obj.theme === 'light' || obj.theme === 'dark') { state.theme = obj.theme; writeLS(LS_KEYS.theme, state.theme); }
-      if (THEME_COLORS.indexOf(obj.themeColor) !== -1) { state.themeColor = obj.themeColor; writeLS(LS_KEYS.themeColor, state.themeColor); }
-      if (typeof obj.keepAwake === 'boolean') { state.keepAwake = obj.keepAwake; writeLS(LS_KEYS.keepAwake, state.keepAwake); }
-      if (state.units && state.units.length) cleanupStaleWordData();
+      let applied = false; // only report success if something valid was actually imported
+      if (isPlainObject(obj.known)) { state.known = obj.known; writeLS(LS_KEYS.known, state.known); applied = true; }
+      if (isPlainObject(obj.manualReview)) { state.manualReview = obj.manualReview; writeLS(LS_KEYS.manualReview, state.manualReview); applied = true; }
+      if (isPlainObject(obj.autoReview)) { state.autoReview = obj.autoReview; writeLS(LS_KEYS.autoReview, state.autoReview); applied = true; }
+      if (Array.isArray(obj.quizHistory)) { state.quizHistory = obj.quizHistory.slice(-40); writeLS(LS_KEYS.quizHistory, state.quizHistory); applied = true; }
+      const themeChanged = THEME_PREFS.indexOf(obj.theme) !== -1;
+      const colorChanged = THEME_COLORS.indexOf(obj.themeColor) !== -1;
+      if (themeChanged) { state.theme = obj.theme; writeLS(LS_KEYS.theme, state.theme); applied = true; }
+      if (colorChanged) { state.themeColor = obj.themeColor; writeLS(LS_KEYS.themeColor, state.themeColor); applied = true; }
+      if (typeof obj.keepAwake === 'boolean') { state.keepAwake = obj.keepAwake; writeLS(LS_KEYS.keepAwake, state.keepAwake); applied = true; }
+      // No pruning here: a backup may hold progress for words this build
+      // doesn't ship (e.g. exported from another model version) — keep it.
+      if (themeChanged) { emit('theme-preference-changed', getThemePreference()); emit('theme-changed', getTheme()); }
+      if (colorChanged) emit('theme-color-changed', getThemeColor());
+      if (!applied) return false;
       emit('data-imported', {});
       return true;
     } catch (e) {
@@ -863,7 +988,9 @@
     getStatistics: getStatistics,
     getLessonVocabularyProgress: getLessonVocabularyProgress,
     getMissingSections: function () { return state.missingSections.slice(); },
-    getTheme: getTheme, setTheme: setTheme,
+    getTheme: getTheme, getThemePreference: getThemePreference, setTheme: setTheme,
+    getAppVersionInfo: function () { return { current: versionInfo.current, previous: versionInfo.previous, changed: versionInfo.changed, history: readAppMeta().history }; },
+    pruneOrphanedProgress: pruneOrphanedProgress,
     getThemeColor: getThemeColor, setThemeColor: setThemeColor, getThemeColors: function () { return THEME_COLORS.slice(); },
     getKeepAwake: getKeepAwake, setKeepAwake: setKeepAwake,
     getQuizHistory: function () { return state.quizHistory.slice(); },
