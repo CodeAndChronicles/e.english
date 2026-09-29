@@ -44,6 +44,9 @@
       <button class="nav-btn" data-nav="settings">
         <span>Settings</span>
       </button>
+      <button class="nav-btn" data-nav="info">
+        <span>Info</span>
+      </button>
     </nav>
     <main id="screen-container"></main>
     <nav id="bottom-nav" class="bottom-nav" hidden>
@@ -56,9 +59,13 @@
       <button class="nav-btn" data-nav="settings">
         <span>Settings</span>
       </button>
+      <button class="nav-btn" data-nav="info">
+        <span>Info</span>
+      </button>
     </nav>
   </div>
 
+  <script src="JavaScript/version.js"></script>
   <script src="JavaScript/icons.js"></script>
   <script src="JavaScript/ux.js"></script>
   <script src="JavaScript/ui.js"></script>
@@ -68,8 +75,27 @@
       UI.init();
     });
     if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
+      // When a new model version's worker takes over (it has just dropped the
+      // old version's caches), reload once so this page runs the new files.
+      // Never mid-quiz: wait until no quiz is active. sessionStorage (not the
+      // learning data) remembers the version we already reloaded for, so this
+      // can never loop.
+      navigator.serviceWorker.addEventListener('message', function (ev) {
+        var d = ev.data;
+        if (!d || d.type !== 'EE_CACHE_ACTIVATED') return;
+        var key = 'eenglish.reloadedFor';
+        try { if (sessionStorage.getItem(key) === String(d.version)) return; } catch (e) {}
+        (function go() {
+          if (window.UX && UX.getCurrentQuiz && UX.getCurrentQuiz()) { setTimeout(go, 2000); return; }
+          try { sessionStorage.setItem(key, String(d.version)); } catch (e) {}
+          location.reload();
+        })();
+      });
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('sw.js').catch(function () {});
+        // updateViaCache:'none' → the worker's imported version.js is re-checked on
+        // the network every time, so a version bump (forward OR backward) is seen
+        // immediately instead of after the HTTP cache expires.
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () {});
       });
     }
   </script>
