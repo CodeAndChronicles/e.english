@@ -18,7 +18,7 @@
 .settings-row-icon {
   display: inline-flex; align-items: center; justify-content: center;
   width: 38px; height: 38px; border-radius: var(--r-md);
-  background: var(--color-mint); color: var(--color-primary); flex-shrink: 0;
+  background: var(--tone-bg, var(--color-mint)); color: var(--tone, var(--color-ink)); flex-shrink: 0;
 }
 .settings-row-text { flex: 1; min-width: 0; }
 .settings-row-title { font-weight: var(--fw-medium); }
@@ -35,38 +35,44 @@
   color: var(--color-text-muted);
 }
 .segmented-btn.active { background: var(--color-primary); color: var(--color-primary-contrast); }
+.segmented-btn.active .segmented-sub { opacity: 0.9; }
 .segmented-btn { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
 .segmented-icon { font-size: 16px; }
 .segmented-sub { font-family: var(--font-en); font-size: 10px; font-weight: var(--fw-regular); opacity: 0.8; line-height: 1.2; }
-.segmented-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.segmented-btn:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
 /* Full-width variant: three equal buttons under the row title. */
 .settings-row-flush { border-bottom: none; padding-bottom: var(--sp-sm); }
 .settings-seg-wrap { padding-bottom: var(--sp-md); border-bottom: 1px solid var(--color-border); }
 .segmented-full { display: flex; width: 100%; max-width: 440px; }
 .segmented-full .segmented-btn { flex: 1; min-width: 0; padding: var(--sp-xs) var(--sp-xs); white-space: nowrap; }
 
-/* ---- Theme color grid ---- */
-.theme-color-grid {
-  display: grid; grid-template-columns: repeat(2, 1fr);
-  gap: var(--sp-sm); width: 100%; padding-bottom: var(--sp-md);
-}
+/* ---- Accent color picker: Default + two groups of four ---- */
+.theme-color-picker { width: 100%; display: flex; flex-direction: column; gap: var(--sp-sm); padding-bottom: var(--sp-md); }
+.theme-color-group-title { font-size: var(--font-size-xs); font-weight: var(--fw-medium); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 var(--sp-2xs); }
+.theme-color-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-xs); width: 100%; }
 .theme-color-swatch {
-  display: flex; align-items: center; gap: var(--sp-xs);
+  display: flex; align-items: center; gap: var(--sp-xs); width: 100%;
   padding: var(--sp-sm) var(--sp-md);
   border: 2px solid var(--color-border);
   border-radius: var(--r-md);
   background: var(--color-surface);
+  text-align: start;
 }
-.theme-color-swatch.active { border-color: var(--color-primary); background: var(--color-mint); }
-.swatch-dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); }
-.swatch-green { background: #1FA971; }
-.swatch-blue { background: #2F5FA8; }
-.swatch-gray { background: #55606B; }
-.swatch-red { background: #B23A48; }
-.swatch-purple { background: #7A4FB0; }
-.swatch-lemon { background: #C9A421; }
-.swatch-teal { background: #177A80; }
-.swatch-orange { background: #B4501A; }
+.theme-color-swatch:hover { background: var(--color-surface-alt); }
+.theme-color-swatch:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
+.theme-color-swatch.active { border-color: var(--color-ink); background: var(--color-mint); }
+.swatch-dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+/* Swatches show each palette's own light-mode fill. */
+.swatch-midnight { background: #24407A; }
+.swatch-plum { background: #6E2F63; }
+.swatch-petrol { background: #0F5C6B; }
+.swatch-umber { background: #5E3D2B; }
+.swatch-sky { background: #7FB2E5; }
+.swatch-lavender { background: #A995DC; }
+.swatch-rose { background: #E39AB6; }
+.swatch-sand { background: #D9B679; }
+/* Default = the multi-color look: a conic dot of the base hues. */
+.swatch-default { background: conic-gradient(#2B62C4 0 25%, #B4491A 0 50%, #7047B5 0 75%, #12758B 0 100%); }
 .swatch-label { font-size: var(--font-size-sm); }
 
 /* ---- Toggle switch (keep screen awake) ---- */
@@ -76,13 +82,14 @@
   background: var(--color-disabled);
 }
 .switch-track::after {
-  content: ''; position: absolute; top: 3px; right: 3px;
+  content: ''; position: absolute; top: 3px; left: 3px;
   width: 21px; height: 21px; border-radius: 50%; background: #fff;
   box-shadow: var(--shadow-sm);
   transition: transform var(--t-fast) var(--ease-out);
 }
 .switch-input:checked ~ .switch-track { background: var(--color-primary); }
-.switch-input:checked ~ .switch-track::after { transform: translateX(-19px); }
+.switch-input:checked ~ .switch-track::after { transform: translateX(19px); }
+.switch-input:focus-visible ~ .switch-track { outline: 2px solid var(--color-ink); outline-offset: 2px; }
 
 /* ---- Data action buttons ---- */
 .settings-action-btn { width: 100%; margin: var(--sp-xs) 0; justify-content: flex-start; }
@@ -101,12 +108,13 @@
   z-index: 300; max-width: calc(100% - var(--sp-lg) * 2); text-align: center;
 }
 .settings-toast.show { opacity: 1; transform: translate(-50%, 0); }
-.settings-toast-warn { background: var(--color-review); color: #1B2521; }
+.settings-toast-warn { background: var(--color-review); color: var(--color-bg); }
 
-/* 8 accents: 2 columns on phones, 4 on wider screens (two even rows). */
+/* Each group of 4 palettes: 2 columns on phones, 4 on wider screens. */
 @media (min-width: 600px) {
   .theme-color-grid { grid-template-columns: repeat(4, 1fr); }
   .theme-color-swatch { padding-inline: var(--sp-sm); }
+  .theme-color-default .theme-color-swatch { width: auto; min-width: 220px; }
 }
 
 /* ---- Advanced: collapsed disclosure ---- */
@@ -121,10 +129,10 @@
   font-weight: var(--fw-bold); font-size: var(--font-size-md);
 }
 .advanced-toggle:hover { background: var(--color-surface-alt); }
-.advanced-toggle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.advanced-toggle-icon { color: var(--color-review); }
+.advanced-toggle:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
+.advanced-toggle-icon { color: var(--tone-slate); }
 .advanced-toggle-label { flex: 1; text-align: start; }
-.advanced-chevron { color: var(--color-text-muted); transform: rotate(-90deg); }
+.advanced-chevron { color: var(--color-text-muted); transform: rotate(-90deg); transition: transform var(--t-fast) var(--ease-out); }
 .advanced-toggle.open { margin-bottom: var(--sp-sm); }
 .advanced-toggle.open .advanced-chevron { transform: rotate(0deg); }
 .advanced-panel[hidden] { display: none; }

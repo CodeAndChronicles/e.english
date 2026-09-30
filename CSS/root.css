@@ -1,5 +1,15 @@
-/* root.css — Design tokens only. Green + Mint identity, amber for review/
-   highlight, red for hard/wrong, consistent across light & dark mode. */
+/* root.css — Design tokens only.
+
+   Colour model (two layers):
+     1. BASE / SEMANTIC tokens (this file, top): neutral Carbon-style greys,
+        success / review / danger, per-section "tone" hues and one color per
+        part of speech. In the DEFAULT state nothing is forced to a single
+        accent — the app is intentionally multi-color.
+     2. ACCENT palettes (bottom): 8 muted, Carbon-inspired palettes chosen in
+        Settings. Picking one sets <html data-color="…">, which re-points the
+        accent tokens AND every "tone" token at that palette, so the whole
+        UI adopts one unified accent. Success / review / danger and part-of-
+        speech colors are NOT touched — they keep their meaning. */
 
 @font-face {
   font-family: 'EEnglishFont';
@@ -7,15 +17,10 @@
   font-display: swap;
 }
 
-/* Shared tokens that don't change between themes (typography, spacing,
-   radius, motion, layout) live on a bare :root — no attribute needed. */
+/* Shared tokens that don't change between themes. */
 :root {
-  /* ---- Typography ----
-     Two stacks on purpose: Arabic UI chrome uses the custom brand font,
-     while English word/answer content uses a clean system Latin stack at
-     a slightly larger relative size — mixing them under one font/size was
-     exactly the "الكلام الانجليزي بنفس حجم وخط العربي" problem. */
-  --font-main: 'EEnglishFont', system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+  /* ---- Typography ---- */
+  --font-main: 'EEnglishFont', system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --font-en: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-size-xs: 12px;
   --font-size-sm: 13.5px;
@@ -53,164 +58,224 @@
 }
 
 /* ---- Theme tokens: driven ONLY by data-theme, set by ui.js from the
-   EFFECTIVE theme (UX.getTheme()). For the "system" preference, UX
-   resolves prefers-color-scheme in JS and re-emits on OS changes, so the
-   CSS never needs a media query. `:root` (no attribute) below is just the
+   EFFECTIVE theme (UX.getTheme()). "system" is resolved in JS, so the CSS
+   never needs a prefers-color-scheme query. `:root` (no attribute) is the
    pre-JS fallback for the first paint. ---- */
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --color-primary: #1FA971;
-  --color-primary-dark: #0E5543;
-  --color-mint: #E6F8F0;
-  --color-mint-strong: #C4EEDD;
-  --color-primary-contrast: #ffffff;
-
-  --color-success: #1FA971;
-  --color-success-bg: #E6F8F0;
-  --color-review: #C98A1B;
-  --color-review-bg: #FCF1DC;
-  --color-danger: #D94F4F;
-  --color-danger-bg: #FBE9E9;
-
-  --color-bg: #F6F8F7;
+  /* Neutrals (Carbon-style cool greys) */
+  --color-bg: #F4F4F4;
   --color-surface: #FFFFFF;
-  --color-surface-alt: #F0F3F2;
-  --color-border: #E2E8E5;
-  --color-text: #1B2521;
-  --color-text-muted: #66756F;
-  --color-disabled: #B7C0BC;
+  --color-surface-alt: #EDEDED;
+  --color-border: #E0E0E0;
+  --color-text: #161616;
+  --color-text-muted: #6F6F6F;
+  --color-disabled: #B8B8B8;
 
-  /* Part of speech badge — deliberately neutral/indigo so it reads fine
-     next to any of the 4 accent themes below. */
-  --color-pos-bg: #EEF0FB;
-  --color-pos-text: #4B4FCC;
+  /* Default accent = neutral ink (no color forced) */
+  --color-primary: #262626;
+  --color-primary-hover: #3D3D3D;
+  --color-primary-contrast: #FFFFFF;
+  --color-ink: #262626;
+  --color-mint: #ECEEF1;
+  --color-mint-strong: #DDE1E6;
 
-  --shadow-sm: 0 1px 2px rgba(20, 40, 30, 0.05);
-  --shadow-md: 0 4px 14px rgba(20, 40, 30, 0.08);
+  /* Semantic states (never re-pointed by an accent) */
+  --color-success: #198038;
+  --color-success-bg: #DEFBE6;
+  --color-review: #8F6200;
+  --color-review-bg: #FCF1D9;
+  --color-danger: #C1272D;
+  --color-danger-bg: #FBE7E8;
+
+  /* Known-word card tint: semantic green by default, accent tint when an accent is picked */
+  --color-known-bg: var(--color-success-bg);
+  --color-known-border: #B7E6C4;
+  /* "Learned" checkbox / accent bar: semantic green by default, the accent when one is picked */
+  --color-known-fill: #198038;
+  --color-known-contrast: #FFFFFF;
+
+  /* Section / icon "tones": distinct hues by default, unified under an accent */
+  --tone-blue: #2B62C4;   --tone-blue-bg: #E6EEFB;
+  --tone-cyan: #12758B;   --tone-cyan-bg: #E0F2F6;
+  --tone-amber: #8F6200;  --tone-amber-bg: #FBEED7;
+  --tone-violet: #7047B5; --tone-violet-bg: #EEE7F8;
+  --tone-rose: #B3336B;   --tone-rose-bg: #FBE6EE;
+  --tone-slate: #4A5563;  --tone-slate-bg: #E9ECF0;
+
+  /* Part of speech: one color each */
+  --pos-noun-fg: #1F5FBF;  --pos-noun-bg: #E5EDFB;
+  --pos-verb-fg: #B4491A;  --pos-verb-bg: #FBEBDF;
+  --pos-adj-fg: #7047B5;   --pos-adj-bg: #EEE7F8;
+  --pos-adv-fg: #0E7490;   --pos-adv-bg: #DFF2F7;
+  --pos-pron-fg: #B3336B;  --pos-pron-bg: #FBE6EE;
+  --pos-prep-fg: #2A7330;  --pos-prep-bg: #E3F3E4;
+  --pos-conj-fg: #856400;  --pos-conj-bg: #FBF2CF;
+  --pos-other-fg: #5A6470; --pos-other-bg: #ECEEF1;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.09);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-primary: #34C98A;
-  --color-primary-dark: #8FE9C4;
-  --color-mint: #113328;
-  --color-mint-strong: #16493A;
-  --color-primary-contrast: #06140F;
+  --color-bg: #161616;
+  --color-surface: #262626;
+  --color-surface-alt: #303030;
+  --color-border: #393939;
+  --color-text: #F4F4F4;
+  --color-text-muted: #A8A8A8;
+  --color-disabled: #565656;
 
-  --color-success: #34C98A;
-  --color-success-bg: #113328;
-  --color-review: #E3A73F;
-  --color-review-bg: #3A2E13;
-  --color-danger: #E37272;
-  --color-danger-bg: #3A1A1A;
+  --color-primary: #E8E8E8;
+  --color-primary-hover: #FFFFFF;
+  --color-primary-contrast: #161616;
+  --color-ink: #E8E8E8;
+  --color-mint: #2E3238;
+  --color-mint-strong: #3A3F46;
 
-  --color-bg: #101512;
-  --color-surface: #171E1A;
-  --color-surface-alt: #1E2622;
-  --color-border: #2A332E;
-  --color-text: #EAF1EC;
-  --color-text-muted: #98A6A0;
-  --color-disabled: #4A544E;
+  --color-success: #5FD07A;
+  --color-success-bg: #0F2E1A;
+  --color-review: #E7B14F;
+  --color-review-bg: #382A10;
+  --color-danger: #F08A8E;
+  --color-danger-bg: #3A1719;
 
-  --color-pos-bg: #23243D;
-  --color-pos-text: #A5A8F5;
+  --color-known-bg: var(--color-success-bg);
+  --color-known-border: #1C4A2C;
+  --color-known-fill: #5FD07A;
+  --color-known-contrast: #06210F;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --tone-blue: #82A9F2;   --tone-blue-bg: #17233C;
+  --tone-cyan: #5CC4DA;   --tone-cyan-bg: #10303A;
+  --tone-amber: #E7B14F;  --tone-amber-bg: #382A10;
+  --tone-violet: #B79BEA; --tone-violet-bg: #271D3B;
+  --tone-rose: #E58BB3;   --tone-rose-bg: #3A1626;
+  --tone-slate: #A9B4C2;  --tone-slate-bg: #22272E;
+
+  --pos-noun-fg: #8DB1F2;  --pos-noun-bg: #182640;
+  --pos-verb-fg: #F0A070;  --pos-verb-bg: #3A2213;
+  --pos-adj-fg: #B79BEA;   --pos-adj-bg: #271D3B;
+  --pos-adv-fg: #67CBE0;   --pos-adv-bg: #10303A;
+  --pos-pron-fg: #E58BB3;  --pos-pron-bg: #3A1626;
+  --pos-prep-fg: #7FCB84;  --pos-prep-bg: #15301A;
+  --pos-conj-fg: #E2C04D;  --pos-conj-bg: #352C0B;
+  --pos-other-fg: #AAB3BE; --pos-other-bg: #262B31;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
 /* =====================================================================
-   Accent color themes — 8 "premium/Carbon-style" desaturated palettes,
-   chosen from Settings, fully independent of light/dark. Only the accent
-   tokens change here; every neutral (bg/surface/border/text) above stays
-   the same regardless of which color is picked. Higher selector
-   specificity ([data-color][data-theme] = 2 attributes) means these
-   always win over the plain [data-theme] defaults above, so "green" below
-   is really just documenting the default rather than changing it. ===== */
+   Accent palettes. Each defines six tokens per mode:
+     --color-primary          fill (buttons, active segments)
+     --color-primary-hover    hover fill
+     --color-primary-contrast text on the fill (>= 4.5:1, checked below)
+     --color-ink              accent as TEXT / icon / bar on surfaces (>= 4.5:1)
+     --color-mint             soft tint (hover, secondary buttons, badges)
+     --color-mint-strong      stronger tint (borders, pressed)
+   No neon, no green. ===================================================== */
 
-/* ---- Green (default) ---- */
-:root[data-color="green"][data-theme="light"] {
-  --color-primary: #1FA971; --color-primary-dark: #0E5543;
-  --color-mint: #E6F8F0; --color-mint-strong: #C4EEDD; --color-primary-contrast: #ffffff;
-}
-:root[data-color="green"][data-theme="dark"] {
-  --color-primary: #34C98A; --color-primary-dark: #8FE9C4;
-  --color-mint: #113328; --color-mint-strong: #16493A; --color-primary-contrast: #06140F;
-}
-
-/* ---- Blue (deep indigo-blue, not a loud pure blue) ---- */
-:root[data-color="blue"][data-theme="light"] {
-  --color-primary: #2F5FA8; --color-primary-dark: #1D3F73;
-  --color-mint: #E7EEF8; --color-mint-strong: #CBDBF0; --color-primary-contrast: #ffffff;
-}
-:root[data-color="blue"][data-theme="dark"] {
-  --color-primary: #6E9CE0; --color-primary-dark: #AEC9F2;
-  --color-mint: #16233A; --color-mint-strong: #1E2F4C; --color-primary-contrast: #071120;
+/* Shared: any explicit accent unifies the tones and the known-card tint.
+   (Same specificity as the [data-theme] blocks above and placed after them,
+   so it wins; the semantic success/review/danger/POS tokens are not listed
+   here on purpose.) */
+:root[data-color] {
+  --color-known-bg: var(--color-mint);
+  --color-known-border: var(--color-mint-strong);
+  --color-known-fill: var(--color-primary);
+  --color-known-contrast: var(--color-primary-contrast);
+  --tone-blue: var(--color-ink);   --tone-blue-bg: var(--color-mint);
+  --tone-cyan: var(--color-ink);   --tone-cyan-bg: var(--color-mint);
+  --tone-amber: var(--color-ink);  --tone-amber-bg: var(--color-mint);
+  --tone-violet: var(--color-ink); --tone-violet-bg: var(--color-mint);
+  --tone-rose: var(--color-ink);   --tone-rose-bg: var(--color-mint);
+  --tone-slate: var(--color-ink);  --tone-slate-bg: var(--color-mint);
 }
 
-/* ---- Gray (graphite, cool-neutral accent) ---- */
-:root[data-color="gray"][data-theme="light"] {
-  --color-primary: #55606B; --color-primary-dark: #333B42;
-  --color-mint: #EDEFF1; --color-mint-strong: #DADEE2; --color-primary-contrast: #ffffff;
+/* ---- Deep palettes — rich, dark-toned accents; the fill itself is dark, so white text sits on it. ---- */
+
+/* Midnight */
+:root[data-color="midnight"][data-theme="light"] {
+  --color-primary: #24407A; --color-primary-hover: #1B3262; --color-primary-contrast: #FFFFFF;
+  --color-ink: #24407A; --color-mint: #E8EDF7; --color-mint-strong: #D0DAEE;
 }
-:root[data-color="gray"][data-theme="dark"] {
-  --color-primary: #A6AEB7; --color-primary-dark: #D3D8DD;
-  --color-mint: #23262A; --color-mint-strong: #2E3236; --color-primary-contrast: #14161A;
+:root[data-color="midnight"][data-theme="dark"] {
+  --color-primary: #8AA8E8; --color-primary-hover: #A3BCF0; --color-primary-contrast: #0B1630;
+  --color-ink: #9DB7EE; --color-mint: #182240; --color-mint-strong: #20305A;
 }
 
-/* ---- Red (muted brick/burgundy, not a pure alert-red) ---- */
-:root[data-color="red"][data-theme="light"] {
-  --color-primary: #B23A48; --color-primary-dark: #7C2A34;
-  --color-mint: #FBEBEC; --color-mint-strong: #F3D4D7; --color-primary-contrast: #ffffff;
+/* Plum */
+:root[data-color="plum"][data-theme="light"] {
+  --color-primary: #6E2F63; --color-primary-hover: #582650; --color-primary-contrast: #FFFFFF;
+  --color-ink: #6E2F63; --color-mint: #F5E9F3; --color-mint-strong: #EACFE6;
 }
-:root[data-color="red"][data-theme="dark"] {
-  --color-primary: #E3808C; --color-primary-dark: #F2AEB4;
-  --color-mint: #331519; --color-mint-strong: #451C21; --color-primary-contrast: #1A0A0C;
-}
-
-/* ---- Purple (muted plum/violet accent) ---- */
-:root[data-color="purple"][data-theme="light"] {
-  --color-primary: #7A4FB0; --color-primary-dark: #52347D;
-  --color-mint: #F1EBF9; --color-mint-strong: #E1D2F1; --color-primary-contrast: #ffffff;
-}
-:root[data-color="purple"][data-theme="dark"] {
-  --color-primary: #B698E0; --color-primary-dark: #D6C3F0;
-  --color-mint: #241B34; --color-mint-strong: #322547; --color-primary-contrast: #130E1C;
+:root[data-color="plum"][data-theme="dark"] {
+  --color-primary: #D18EC4; --color-primary-hover: #DDA6D2; --color-primary-contrast: #2A0F26;
+  --color-ink: #DCA0D0; --color-mint: #331830; --color-mint-strong: #472245;
 }
 
-/* ---- Teal (deep blue-green; sits between green and blue) ----
-   Contrast (WCAG): light — white on #177A80 = 5.1:1, dark — #04191B on
-   #4CC0C7 = 8.3:1; accent-as-text on the page surface stays >= 4.5:1. */
-:root[data-color="teal"][data-theme="light"] {
-  --color-primary: #177A80; --color-primary-dark: #0C4F54;
-  --color-mint: #E4F4F5; --color-mint-strong: #C2E5E7; --color-primary-contrast: #ffffff;
+/* Petrol */
+:root[data-color="petrol"][data-theme="light"] {
+  --color-primary: #0F5C6B; --color-primary-hover: #0B4855; --color-primary-contrast: #FFFFFF;
+  --color-ink: #0F5C6B; --color-mint: #E2F1F4; --color-mint-strong: #C5E3E9;
 }
-:root[data-color="teal"][data-theme="dark"] {
-  --color-primary: #4CC0C7; --color-primary-dark: #9BE2E6;
-  --color-mint: #0F2E31; --color-mint-strong: #164246; --color-primary-contrast: #04191B;
+:root[data-color="petrol"][data-theme="dark"] {
+  --color-primary: #5FBCCD; --color-primary-hover: #7BCBDA; --color-primary-contrast: #062229;
+  --color-ink: #78C8D8; --color-mint: #102B31; --color-mint-strong: #173F48;
 }
 
-/* ---- Orange (burnt orange / clay; warmer and redder than Lemon) ----
-   Contrast (WCAG): light — white on #B4501A >= 4.5:1, dark — #1E0E03 on
-   #F0975E = 8.3:1. */
-:root[data-color="orange"][data-theme="light"] {
-  --color-primary: #B4501A; --color-primary-dark: #7A360F;
-  --color-mint: #FBEEE4; --color-mint-strong: #F4D9C5; --color-primary-contrast: #ffffff;
+/* Umber */
+:root[data-color="umber"][data-theme="light"] {
+  --color-primary: #5E3D2B; --color-primary-hover: #4A2F21; --color-primary-contrast: #FFFFFF;
+  --color-ink: #5E3D2B; --color-mint: #F4ECE6; --color-mint-strong: #E6D6CA;
 }
-:root[data-color="orange"][data-theme="dark"] {
-  --color-primary: #F0975E; --color-primary-dark: #F7C4A0;
-  --color-mint: #35200F; --color-mint-strong: #4A2E17; --color-primary-contrast: #1E0E03;
+:root[data-color="umber"][data-theme="dark"] {
+  --color-primary: #D2A487; --color-primary-hover: #DDB69C; --color-primary-contrast: #2B1A10;
+  --color-ink: #DBB096; --color-mint: #31241B; --color-mint-strong: #443327;
 }
 
-/* ---- Lemon (warm, desaturated yellow-gold accent) ---- */
-:root[data-color="lemon"][data-theme="light"] {
-  --color-primary: #A98A1F; --color-primary-dark: #755E12;
-  --color-mint: #FBF6E3; --color-mint-strong: #F2E7BE; --color-primary-contrast: #2B2205;
+/* ---- Soft palettes — lighter, pastel-leaning accents; the fill is light, so it carries DARK text, and --color-ink (a deeper shade of the same hue) is what shows up as text/icons/bars. ---- */
+
+/* Sky */
+:root[data-color="sky"][data-theme="light"] {
+  --color-primary: #7FB2E5; --color-primary-hover: #6FA5DC; --color-primary-contrast: #0C2340;
+  --color-ink: #1F5FA6; --color-mint: #E9F2FB; --color-mint-strong: #D2E5F7;
 }
-:root[data-color="lemon"][data-theme="dark"] {
-  --color-primary: #E0C349; --color-primary-dark: #F0DE8F;
-  --color-mint: #302A12; --color-mint-strong: #423918; --color-primary-contrast: #1C1704;
+:root[data-color="sky"][data-theme="dark"] {
+  --color-primary: #8FBDEB; --color-primary-hover: #A6CAF0; --color-primary-contrast: #0C2340;
+  --color-ink: #9CC5EE; --color-mint: #182A3D; --color-mint-strong: #223C56;
+}
+
+/* Lavender */
+:root[data-color="lavender"][data-theme="light"] {
+  --color-primary: #A995DC; --color-primary-hover: #9C87D3; --color-primary-contrast: #241645;
+  --color-ink: #5D45A5; --color-mint: #F0ECFA; --color-mint-strong: #E0D8F4;
+}
+:root[data-color="lavender"][data-theme="dark"] {
+  --color-primary: #B9A9E6; --color-primary-hover: #CBBEEC; --color-primary-contrast: #241645;
+  --color-ink: #C4B6EA; --color-mint: #262038; --color-mint-strong: #352E52;
+}
+
+/* Rose */
+:root[data-color="rose"][data-theme="light"] {
+  --color-primary: #E39AB6; --color-primary-hover: #DB88A8; --color-primary-contrast: #3A0F22;
+  --color-ink: #A03A65; --color-mint: #FBEDF2; --color-mint-strong: #F5D8E3;
+}
+:root[data-color="rose"][data-theme="dark"] {
+  --color-primary: #EBA5BF; --color-primary-hover: #F1BBD0; --color-primary-contrast: #3A0F22;
+  --color-ink: #EBAEC5; --color-mint: #361D28; --color-mint-strong: #4C2A3A;
+}
+
+/* Sand */
+:root[data-color="sand"][data-theme="light"] {
+  --color-primary: #D9B679; --color-primary-hover: #CFA967; --color-primary-contrast: #3A2A08;
+  --color-ink: #7A560A; --color-mint: #FAF3E4; --color-mint-strong: #F1E3C3;
+}
+:root[data-color="sand"][data-theme="dark"] {
+  --color-primary: #E3C288; --color-primary-hover: #EBD1A2; --color-primary-contrast: #3A2A08;
+  --color-ink: #E1C48F; --color-mint: #332B1B; --color-mint-strong: #493E28;
 }

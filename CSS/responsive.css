@@ -12,7 +12,7 @@ html, body {
   font-size: var(--font-size-md);
   color: var(--color-text);
   background: var(--color-bg);
-  direction: rtl;
+  direction: ltr;
 }
 /* Layout-stability guards: reserve the scrollbar gutter (no horizontal
    jump when a screen becomes scrollable), never scroll sideways, and let
@@ -29,8 +29,7 @@ button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
 .icon { display: inline-block; width: 1em; height: 1em; font-size: 20px; line-height: 1; flex-shrink: 0; }
 
 /* English content (the word itself, typed answers, synonym/antonym chips,
-   search-result words) gets its own font + a touch more size — this is
-   what was missing before ("الكلام الانجليزي بنفس حجم وخط العربي"). */
+   search-result words) uses the clean Latin UI stack at a slightly larger size. */
 .word-text, .quiz-input, .quiz-input::placeholder, .result-word,
 .extra-chip-text, .pos-badge, .swatch-label {
   font-family: var(--font-en);
@@ -63,7 +62,7 @@ button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 42px; height: 42px; border-radius: var(--r-md);
-  color: var(--color-primary); flex-shrink: 0;
+  color: var(--color-ink); flex-shrink: 0;
 }
 .icon-btn:hover, .back-btn:hover { background: var(--color-mint); }
 
@@ -76,7 +75,7 @@ button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
   padding: var(--sp-xs) var(--sp-md);
   margin-bottom: var(--sp-md);
 }
-.search-box:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent); }
+.search-box:focus-within { border-color: var(--color-ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-ink) 18%, transparent); }
 .search-icon { color: var(--color-text-muted); }
 .search-input { flex: 1; border: none; outline: none; background: transparent; padding: var(--sp-xs) 0; min-width: 0; }
 .search-results { margin-bottom: var(--sp-sm); }
@@ -91,7 +90,7 @@ button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
   border-radius: var(--r-md);
 }
 button.result-row:hover { background: var(--color-surface-alt); border-color: var(--color-mint-strong); }
-.result-icon { color: var(--color-primary); }
+.result-icon { color: var(--tone, var(--color-ink)); }
 .result-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
 .result-word { font-weight: var(--fw-bold); }
 .result-meaning { color: var(--color-text-muted); font-size: var(--font-size-sm); }
@@ -115,14 +114,14 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 }
 .nav-card:hover { box-shadow: var(--shadow-md); border-color: var(--color-mint-strong); }
 .nav-card-icon {
-  color: var(--color-primary);
-  background: var(--color-mint);
+  color: var(--tone, var(--color-ink));
+  background: var(--tone-bg, var(--color-mint));
   border-radius: var(--r-md);
   padding: var(--sp-sm);
   font-size: 22px;
   flex-shrink: 0;
 }
-.nav-card-text { flex: 1; min-width: 0; text-align: right; }
+.nav-card-text { flex: 1; min-width: 0; text-align: start; }
 .nav-card-title { font-size: var(--font-size-lg); font-weight: var(--fw-bold); }
 .nav-card-sub { font-size: var(--font-size-sm); color: var(--color-text-muted); }
 .nav-card-chevron { color: var(--color-text-muted); flex-shrink: 0; }
@@ -140,10 +139,16 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .section-icon-badge {
   display: inline-flex; align-items: center; justify-content: center;
   width: 42px; height: 42px; border-radius: var(--r-md);
-  background: var(--color-mint); color: var(--color-primary); flex-shrink: 0;
+  background: var(--tone-bg, var(--color-mint)); color: var(--tone, var(--color-ink)); flex-shrink: 0;
 }
-.sec-idioms .section-icon-badge { background: var(--color-review-bg); color: var(--color-review); }
-.sec-synonyms .section-icon-badge { background: var(--color-surface-alt); color: var(--color-text-muted); }
+/* Tones: each section type has its own hue by default; under an accent they
+   all resolve to that accent (see the --tone-* tokens in root.css). */
+.tone-blue, .sec-vocabulary { --tone: var(--tone-blue); --tone-bg: var(--tone-blue-bg); }
+.tone-cyan, .sec-synonyms { --tone: var(--tone-cyan); --tone-bg: var(--tone-cyan-bg); }
+.tone-amber, .sec-idioms { --tone: var(--tone-amber); --tone-bg: var(--tone-amber-bg); }
+.tone-violet, .sec-derivatives { --tone: var(--tone-violet); --tone-bg: var(--tone-violet-bg); }
+.tone-rose { --tone: var(--tone-rose); --tone-bg: var(--tone-rose-bg); }
+.tone-slate, .sec-generic { --tone: var(--tone-slate); --tone-bg: var(--tone-slate-bg); }
 .section-head-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .section-title { font-size: var(--font-size-lg); font-weight: var(--fw-bold); margin: 0; }
 .section-count { font-size: var(--font-size-xs); color: var(--color-text-muted); }
@@ -168,8 +173,8 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
   font-size: var(--font-size-md);
 }
 .btn-primary { background: var(--color-primary); color: var(--color-primary-contrast); }
-.btn-primary:hover { background: var(--color-primary-dark); }
-.btn-secondary { background: var(--color-mint); color: var(--color-primary-dark); }
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-secondary { background: var(--color-mint); color: var(--color-ink); }
 .btn-secondary:hover { background: var(--color-mint-strong); }
 .btn-danger { background: var(--color-danger-bg); color: var(--color-danger); }
 .btn-danger:hover { background: var(--color-danger); color: #fff; }
@@ -188,7 +193,7 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .cb-box .icon { font-size: 15px; position: absolute; display: none; }
 .cb-input:checked ~ .cb-box,
 .cb-input:indeterminate ~ .cb-box {
-  background: var(--color-primary); border-color: var(--color-primary); color: var(--color-primary-contrast);
+  background: var(--color-known-fill); border-color: var(--color-known-fill); color: var(--color-known-contrast);
 }
 .cb-input:checked ~ .cb-box .cb-icon-checked { display: block; }
 .cb-input:indeterminate ~ .cb-box .cb-icon-indeterminate { display: block; }
@@ -214,8 +219,8 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .group-title { flex: 1; min-width: 0; font-weight: var(--fw-medium); cursor: pointer; }
 .group-count { font-size: var(--font-size-xs); color: var(--color-text-muted); cursor: pointer; flex-shrink: 0; }
 .group-toggle { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; color: var(--color-text-muted); flex-shrink: 0; }
-.group-chevron { transform: rotate(-90deg); }
-.group.open .group-chevron { transform: rotate(0deg); }
+.group-chevron { transform: rotate(0deg); }
+.group.open .group-chevron { transform: rotate(90deg); }
 .group-body { display: none; flex-direction: column; }
 .group.open .group-body { display: flex; }
 
@@ -266,18 +271,18 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 /* Known: quiet mint tint + a thin accent bar on the reading-start edge. */
 .word-card::before {
   content: ''; position: absolute; inset-block: 0; inset-inline-start: 0;
-  width: 4px; background: var(--color-primary);
+  width: 4px; background: var(--color-known-fill);
   transform: scaleY(0); transform-origin: center;
 }
-.word-card.is-known { background: var(--color-mint); border-color: var(--color-mint-strong); }
+.word-card.is-known { background: var(--color-known-bg); border-color: var(--color-known-border); }
 .word-card.is-known::before { transform: scaleY(1); }
 .word-card.is-review { border-color: var(--color-review); }
 
 .word-card-head { display: flex; align-items: flex-start; gap: var(--sp-sm); min-width: 0; }
 /* 44px touch target; negative margins keep the visual box compact. */
-.word-cb { justify-content: center; min-width: 44px; min-height: 44px; margin: -10px -10px -10px 0; }
+.word-cb { justify-content: center; min-width: 44px; min-height: 44px; margin: -10px 0 -10px -10px; }
 .word-cb .cb-box { width: 26px; height: 26px; border-radius: 8px; }
-.cb-input:focus-visible ~ .cb-box, .flag-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.cb-input:focus-visible ~ .cb-box, .flag-btn:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
 
 .word-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .word-text {
@@ -286,12 +291,22 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
   font-size: clamp(21px, 5.8vw, 26px); line-height: 1.25; letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
+.pos-group { display: inline-flex; flex-wrap: wrap; gap: 4px; }
 .pos-badge {
   display: inline-flex; align-items: center;
   padding: 1px 8px; border-radius: var(--r-pill);
   font-size: 11px; font-weight: var(--fw-medium); font-style: italic; line-height: 1.6;
-  background: var(--color-pos-bg); color: var(--color-pos-text);
+  background: var(--pos-bg); color: var(--pos-fg);
 }
+/* One color per part of speech (tokens in root.css; NOT affected by the accent). */
+.pos-noun  { --pos-fg: var(--pos-noun-fg);  --pos-bg: var(--pos-noun-bg); }
+.pos-verb  { --pos-fg: var(--pos-verb-fg);  --pos-bg: var(--pos-verb-bg); }
+.pos-adj   { --pos-fg: var(--pos-adj-fg);   --pos-bg: var(--pos-adj-bg); }
+.pos-adv   { --pos-fg: var(--pos-adv-fg);   --pos-bg: var(--pos-adv-bg); }
+.pos-pron  { --pos-fg: var(--pos-pron-fg);  --pos-bg: var(--pos-pron-bg); }
+.pos-prep  { --pos-fg: var(--pos-prep-fg);  --pos-bg: var(--pos-prep-bg); }
+.pos-conj  { --pos-fg: var(--pos-conj-fg);  --pos-bg: var(--pos-conj-bg); }
+.pos-other { --pos-fg: var(--pos-other-fg); --pos-bg: var(--pos-other-bg); }
 .diff-badge {
   display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
   padding: 2px 8px; border-radius: var(--r-pill);
@@ -301,6 +316,9 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .diff-easy { background: var(--color-success-bg); color: var(--color-success); }
 .diff-hard { background: var(--color-danger-bg); color: var(--color-danger); }
 
+/* Meanings may be written in the learner's own language (dir="auto" lets each one
+   run in its natural direction); they still line up on the card's left edge. */
+.word-meaning, .result-meaning { text-align: left; }
 .word-meaning {
   margin: 0; font-size: var(--font-size-md); line-height: 1.75;
   color: var(--color-text); overflow-wrap: anywhere;
@@ -337,7 +355,7 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .quiz-header { justify-content: space-between; }
 .quiz-timer {
   display: inline-flex; align-items: center; gap: 6px;
-  font-weight: var(--fw-bold); color: var(--color-primary);
+  font-weight: var(--fw-bold); color: var(--color-ink);
   font-variant-numeric: tabular-nums;
 }
 .quiz-timer.low-time { color: var(--color-danger); }
@@ -355,8 +373,8 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
   outline: none;
   background: var(--color-surface);
 }
-.quiz-input:focus { border-color: var(--color-primary); }
-/* Per-question feedback is a colour cue only — never the correct word —
+.quiz-input:focus { border-color: var(--color-ink); }
+/* Per-question feedback is a color cue only — never the correct word —
    so the exam itself stays "blind" until the results screen. */
 .quiz-input.answered { pointer-events: none; }
 .quiz-input.answered-correct { border-color: var(--color-success); background: var(--color-success-bg); }
@@ -391,14 +409,30 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .stats-card { margin-bottom: 0; }
 
 /* ---------- Info ---------- */
-.info-card { text-align: center; padding: var(--sp-xl) var(--sp-lg); }
-.info-credit { margin: 0; font-size: var(--font-size-lg); font-weight: var(--fw-medium); unicode-bidi: isolate; }
-.info-label { font-family: var(--font-en); color: var(--color-text-muted); }
-.info-names { unicode-bidi: isolate; }
+/* ---------- Info ---------- */
+.info-page { display: flex; flex-direction: column; min-height: calc(100dvh - var(--nav-height) - env(safe-area-inset-bottom, 0px) - var(--sp-lg) * 2 - 8px); }
+.info-card { padding: var(--sp-lg); }
+.info-card-title { margin: 0 0 var(--sp-xs); font-size: var(--font-size-lg); font-weight: var(--fw-bold); }
+.info-card-intro { margin: 0 0 var(--sp-md); line-height: 1.6; }
+.pos-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pos-item { display: flex; gap: var(--sp-md); align-items: flex-start; padding: var(--sp-sm) 0; border-top: 1px solid var(--color-border); }
+.pos-item:first-child { border-top: none; }
+.pos-badge-lg { flex: 0 0 76px; justify-content: center; font-size: var(--font-size-sm); padding: 3px 8px; font-style: normal; font-weight: var(--fw-bold); }
+.pos-item-body { min-width: 0; }
+.pos-item-name { font-weight: var(--fw-bold); }
+.pos-item-text { margin: 2px 0 0; line-height: 1.55; font-size: var(--font-size-sm); }
+.pos-item-example { margin: 2px 0 0; font-size: var(--font-size-sm); font-family: var(--font-en); }
+.pos-note { margin: var(--sp-sm) 0 0; padding-top: var(--sp-sm); border-top: 1px solid var(--color-border); line-height: 1.55; }
+/* Small footer credit: light, not bold, pinned to the bottom of the screen. */
+/* The brand font has a single heavy weight, so the footer uses the regular
+   system stack — that is what makes it genuinely light and not bold. */
+.info-footer { font-family: var(--font-en); margin-top: auto; padding: var(--sp-xl) 0 var(--sp-xs); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--fw-regular); }
+.info-footer p { margin: 0; }
+.info-copyright { margin-top: 2px; opacity: 0.85; }
 .stats-row { display: flex; justify-content: space-between; padding: var(--sp-xs) 0; gap: var(--sp-sm); }
 .stats-value { font-weight: var(--fw-bold); flex-shrink: 0; }
 .progress-bar { width: 100%; height: 10px; background: var(--color-surface-alt); border-radius: var(--r-pill); overflow: hidden; margin: var(--sp-sm) 0; }
-.progress-fill { height: 100%; background: var(--color-primary); border-radius: var(--r-pill); }
+.progress-fill { height: 100%; background: var(--tone, var(--color-ink)); border-radius: var(--r-pill); }
 .review-list, .quiz-history-list { display: flex; flex-direction: column; gap: var(--sp-xs); margin-bottom: var(--sp-lg); }
 .quiz-history-item {
   display: flex; align-items: center; gap: var(--sp-md);
@@ -408,7 +442,7 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
   font-size: var(--font-size-sm);
 }
 button.quiz-history-item:hover { background: var(--color-surface-alt); border-color: var(--color-mint-strong); }
-.qh-mode { text-transform: capitalize; color: var(--color-text-muted); flex: 1; text-align: right; font-family: var(--font-en); direction: ltr; }
+.qh-mode { text-transform: capitalize; color: var(--color-text-muted); flex: 1; text-align: start; font-family: var(--font-en); direction: ltr; }
 .qh-stat { display: inline-flex; align-items: center; gap: 4px; font-weight: var(--fw-bold); }
 .qh-correct { color: var(--color-success); }
 .qh-wrong { color: var(--color-danger); }
@@ -417,13 +451,13 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
 /* ---------- Blocked (file://) screen ---------- */
 .blocked-card { text-align: center; }
 .blocked-icon { font-size: 40px; color: var(--color-review); margin-bottom: var(--sp-sm); }
-.blocked-steps { text-align: right; margin: var(--sp-md) 0 0; padding-inline-start: var(--sp-lg); display: flex; flex-direction: column; gap: var(--sp-sm); }
+.blocked-steps { text-align: start; margin: var(--sp-md) 0 0; padding-inline-start: var(--sp-lg); display: flex; flex-direction: column; gap: var(--sp-sm); }
 
 /* ---------- Theme toggle (persistent, outside re-rendered screens) ---------- */
 .theme-toggle-btn {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + var(--sp-md));
-  left: var(--sp-md);
+  inset-inline-end: var(--sp-md);
   z-index: 200;
   width: 42px; height: 42px;
   border-radius: var(--r-pill);
@@ -431,7 +465,7 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-sm);
-  color: var(--color-primary);
+  color: var(--color-ink);
 }
 .theme-toggle-btn:hover { background: var(--color-mint); }
 
@@ -443,7 +477,7 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
 /* ---------- Mini progress (lesson-scoped Vocabulary progress) ---------- */
 .mini-progress-row { display: flex; align-items: center; gap: var(--sp-xs); margin-top: 4px; }
 .mini-progress { flex: 1; max-width: 140px; height: 6px; background: var(--color-surface-alt); border-radius: var(--r-pill); overflow: hidden; }
-.mini-progress-fill { height: 100%; background: var(--color-primary); border-radius: var(--r-pill); }
+.mini-progress-fill { height: 100%; background: var(--tone, var(--color-ink)); border-radius: var(--r-pill); }
 .mini-progress-text { font-size: var(--font-size-xs); color: var(--color-text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* ---------- Bottom nav ----------
@@ -466,7 +500,7 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
   font-size: 11px; color: var(--color-text-muted); font-family: var(--font-en);
 }
 .nav-btn .icon { font-size: 22px; }
-.nav-btn.active { color: var(--color-primary); }
+.nav-btn.active { color: var(--color-ink); }
 
 /* ---------- Side nav (large screens — replaces the bottom nav so wide
    screens use a proper app-shell layout instead of a stretched phone
@@ -474,14 +508,14 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
 .side-nav {
   display: none;
   position: fixed;
-  inset-inline-end: 0;
+  inset-inline-start: 0;
   top: 0; bottom: 0;
   width: var(--side-nav-width);
   flex-direction: column;
   gap: 2px;
   padding: var(--sp-md) var(--sp-xs);
   background: var(--color-surface);
-  border-inline-start: 1px solid var(--color-border);
+  border-inline-end: 1px solid var(--color-border);
   z-index: 150;
   overflow-y: auto;
 }
@@ -495,7 +529,7 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
 }
 .side-nav .nav-btn .icon { width: 20px; height: 20px; font-size: 20px; }
 .side-nav .nav-btn:hover { background: var(--color-surface-alt); }
-.side-nav .nav-btn.active { background: var(--color-mint); color: var(--color-primary); font-weight: var(--fw-medium); }
+.side-nav .nav-btn.active { background: var(--color-mint); color: var(--color-ink); font-weight: var(--fw-medium); }
 
 /* ---------- Skeleton ---------- */
 .skeleton-wrap { display: flex; flex-direction: column; gap: var(--sp-sm); }
@@ -507,7 +541,8 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
 
 /* ================= Responsive breakpoints ================= */
 @media (min-width: 640px) {
-  #screen-container { padding: var(--sp-lg); }
+  /* keep the bottom-nav clearance — the shorthand alone would drop it */
+  #screen-container { padding: var(--sp-lg); padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--sp-lg)); }
   .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-md); }
   .stats-cards-grid { display: grid; grid-template-columns: 1fr 1fr; }
   .stats-card-overall { grid-column: 1 / -1; }
@@ -520,7 +555,7 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
      centered content column never runs underneath it. */
   .bottom-nav { display: none; }
   .side-nav { display: flex; }
-  #app { padding-inline-end: var(--side-nav-width); }
+  #app { padding-inline-start: var(--side-nav-width); }
   #screen-container { padding: var(--sp-xl) var(--sp-xl); padding-bottom: var(--sp-xl); }
 
   .card-grid { grid-template-columns: 1fr 1fr 1fr; }
@@ -541,3 +576,33 @@ button.quiz-history-item:hover { background: var(--color-surface-alt); border-co
   :root { --nav-height: 58px; }
   .word-card { margin-inline: var(--sp-xs); padding-inline: var(--sp-sm); }
 }
+
+/* ---------- README screen (rendered Markdown) ---------- */
+.readme-card { padding: var(--sp-lg); min-width: 0; }
+/* Long-form reading: regular-weight system font (the brand font is a single heavy
+   weight, which makes **bold** indistinguishable) and a comfortable line length. */
+.md-body { font-family: var(--font-en); font-size: 15.5px; line-height: 1.7; overflow-wrap: anywhere; min-width: 0; max-width: 860px; }
+.md-body > :first-child { margin-top: 0; }
+.md-h { font-weight: var(--fw-bold); line-height: 1.25; margin: var(--sp-lg) 0 var(--sp-sm); scroll-margin-top: var(--sp-md); }
+.md-h1 { font-size: var(--font-size-xxl); margin-top: 0; padding-bottom: var(--sp-sm); border-bottom: 2px solid var(--color-border); }
+.md-h2 { font-size: var(--font-size-xl); margin-top: var(--sp-xl); padding-bottom: var(--sp-xs); border-bottom: 1px solid var(--color-border); }
+.md-h3 { font-size: var(--font-size-lg); }
+.md-h4, .md-h5, .md-h6 { font-size: var(--font-size-md); }
+.md-p { margin: 0 0 var(--sp-md); }
+.md-body a { color: var(--color-ink); text-decoration: underline; text-underline-offset: 2px; }
+.md-body a:hover { text-decoration-thickness: 2px; }
+.md-body a:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; border-radius: 2px; }
+.md-list { margin: 0 0 var(--sp-md); padding-inline-start: var(--sp-lg); display: flex; flex-direction: column; gap: 4px; }
+.md-list .md-list { margin: 4px 0 0; }
+.md-quote { margin: 0 0 var(--sp-md); padding: var(--sp-sm) var(--sp-md); background: var(--color-mint); border-inline-start: 4px solid var(--color-ink); border-radius: 0 var(--r-md) var(--r-md) 0; }
+.md-quote p { margin: 0; }
+.md-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
+.md-pre { margin: 0 0 var(--sp-md); padding: var(--sp-md); background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: var(--r-md); overflow-x: auto; max-width: 100%; }
+.md-pre code { background: none; border: none; padding: 0; font-size: 12.5px; line-height: 1.6; white-space: pre; overflow-wrap: normal; }
+.md-table-wrap { margin: 0 0 var(--sp-md); overflow-x: auto; max-width: 100%; border: 1px solid var(--color-border); border-radius: var(--r-md); }
+.md-table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); }
+.md-table th, .md-table td { padding: var(--sp-xs) var(--sp-sm); border-bottom: 1px solid var(--color-border); vertical-align: top; text-align: start; }
+.md-table th { background: var(--color-surface-alt); font-weight: var(--fw-bold); white-space: nowrap; }
+.md-table tr:last-child td { border-bottom: none; }
+.md-hr { border: none; border-top: 1px solid var(--color-border); margin: var(--sp-lg) 0; }
+.md-img { max-width: 100%; height: auto; border-radius: var(--r-md); }
