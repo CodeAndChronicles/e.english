@@ -1,7 +1,6 @@
 /* ux.js — Pure logic / state / behavior layer. NO DOM access.
-   Merged from the previous ux-state.js + ux-content.js + ux-quiz.js —
-   the LOGIC below is unchanged from the verified version; only the
-   file split was removed per the current UI/UX-only reorganization pass. */
+   Single source of truth for learning state (known words, review state,
+   quiz history) and for the event bus every screen listens to. */
 (function (global) {
   'use strict';
 
@@ -29,7 +28,18 @@
     themeColor: 'eenglish.themeColor',
     keepAwake: 'eenglish.keepAwake'
   };
-  const THEME_COLORS = ['green', 'blue', 'gray', 'red', 'purple', 'lemon', 'teal', 'orange'];
+  // 8 accent palettes: 4 deep + 4 soft (see CSS/root.css). "default" is not a
+  // palette — it means "no accent picked": the multi-color default look.
+  const THEME_COLORS = ['midnight', 'plum', 'petrol', 'umber', 'sky', 'lavender', 'rose', 'sand'];
+  const DEFAULT_COLOR = 'default';
+  // Accent names saved by earlier versions → nearest new palette (or the
+  // default look). Green no longer exists in any form.
+  const LEGACY_COLOR_MAP = { blue: 'midnight', purple: 'plum', teal: 'petrol', orange: 'umber', lemon: 'sand', red: 'rose', gray: null, green: null };
+  function normalizeColor(c) {
+    if (THEME_COLORS.indexOf(c) !== -1) return c;
+    if (Object.prototype.hasOwnProperty.call(LEGACY_COLOR_MAP, c)) return LEGACY_COLOR_MAP[c];
+    return null; // unknown / removed → default look
+  }
   const THEME_PREFS = ['light', 'dark', 'system'];
 
   function readLS(key, fallback) {
@@ -134,14 +144,22 @@
     missingSections: [],
     freshLoad: false, // true for the load right after a version change → bypass the HTTP cache
     theme: readLS(LS_KEYS.theme, null), // 'light' | 'dark' | 'system' | null (null behaves as 'system')
-    themeColor: readLS(LS_KEYS.themeColor, 'green'),
+    themeColor: normalizeColor(readLS(LS_KEYS.themeColor, null)),
     keepAwake: readLS(LS_KEYS.keepAwake, false)
   };
+  // An accent saved by an earlier version (green, blue, ...) is mapped to its
+  // nearest new palette (or the default look) once, and the stored value updated.
+  (function migrateStoredColor() {
+    const raw = readLS(LS_KEYS.themeColor, null);
+    if (raw === null || raw === state.themeColor) return;
+    if (state.themeColor) writeLS(LS_KEYS.themeColor, state.themeColor);
+    else { try { localStorage.removeItem(LS_KEYS.themeColor); } catch (e) {} }
+  })();
 
   /* ---------------- Word ID ----------------
      Data Contract: a word's identity is (unit, lesson-pair, section type,
      the word text itself) — NEVER its group index or position inside the
-     file. This is what "نقل الكلمة أو تغيير ترتيبها" needs: you can move a
+     file. So you can move a
      word to a different group, or reorder groups/words freely in the .md
      file, and its saved progress (known / review / quiz history) stays
      attached to it. Only renaming the word text, or moving it to a
@@ -189,8 +207,9 @@
   }
 
   /* ---------------- Section type normalization ----------------
-     Maps a "## Section Title" heading (Arabic or English, any of the
-     synonyms below) to the internal type key the rest of the app already
+     Maps a "## Section Title" heading (English, plus the legacy Arabic
+     spellings older content files may still use — parser compatibility
+     only, never displayed) to the internal type key the rest of the app already
      keys off of (SECTION_META in ui.js). Anything unrecognized still
      works — it just falls back to a slug of the title itself, and ui.js's
      sectionMeta() shows it with a generic icon/label instead of a
@@ -419,16 +438,25 @@
     return nextBatch();
   }
 
-  // Removes saved progress for words that don't exist in the currently
-  // loaded content. NOT called automatically any more: pruning at startup
-  // meant that opening a build with different content (a rollback such as
-  // 7 → 6, a file that failed to load, an imported backup) could silently
-  // erase real progress. Orphaned ids are harmless — every statistic and
-  // screen only looks at words that exist — so they are now kept until a
-  // caller explicitly asks for a prune, and even then only after a
-  // complete, error-free content load.
-  function pruneOrphanedProgress() {
-    if (!state.contentComplete || !state.units.length) return false;
+  /* ---------------- LocalStorage ↔ content reconciliation ----------------
+     Runs on every normal load (and after an import), once the content has
+     loaded COMPLETELY. It makes what is stored match what the UI can show:
+       • known / manualReview / autoReview: entries whose word id no longer
+         exists in the content are removed;
+       • a word can't be in both review maps (manual wins, duplicate dropped);
+       • quiz history: answers that point to words that don't exist are
+         removed, each record's totals are recomputed from the answers that
+         remain (so "5 wrong" can never be stored when only 3 resolve), and a
+         record with nothing valid left is dropped; a legacy 'close' answer is
+         normalised to 'wrong'.
+     Valid progress is never touched. If any content file failed to load, the
+     content is incomplete, so NOTHING is removed (a missing file must not
+     look like "these words were deleted"). Returns a summary of what changed. */
+  function reconcileStoredData() {
+    const summary = { ran: false, removed: { known: 0, manualReview: 0, autoReview: 0, quizAnswers: 0, quizRecords: 0 } };
+    if (!state.contentComplete || !state.units.length) return summary;
+    summary.ran = true;
+
     const validIds = {};
     state.units.forEach(function (unit) {
       unit.lessons.forEach(function (lesson) {
@@ -439,14 +467,45 @@
         });
       });
     });
-    let changedKnown = false, changedManual = false, changedAuto = false;
-    Object.keys(state.known).forEach(function (id) { if (!validIds[id]) { delete state.known[id]; changedKnown = true; } });
-    Object.keys(state.manualReview).forEach(function (id) { if (!validIds[id]) { delete state.manualReview[id]; changedManual = true; } });
-    Object.keys(state.autoReview).forEach(function (id) { if (!validIds[id]) { delete state.autoReview[id]; changedAuto = true; } });
-    if (changedKnown) writeLS(LS_KEYS.known, state.known);
-    if (changedManual) writeLS(LS_KEYS.manualReview, state.manualReview);
-    if (changedAuto) writeLS(LS_KEYS.autoReview, state.autoReview);
-    return changedKnown || changedManual || changedAuto;
+
+    function cleanMap(map, name) {
+      if (!isPlainObject(map)) return {};
+      const out = {};
+      Object.keys(map).forEach(function (id) {
+        if (map[id] && validIds[id]) out[id] = true; else summary.removed[name]++;
+      });
+      return out;
+    }
+    const known = cleanMap(state.known, 'known');
+    const manual = cleanMap(state.manualReview, 'manualReview');
+    const auto = cleanMap(state.autoReview, 'autoReview');
+    Object.keys(auto).forEach(function (id) { if (manual[id]) { delete auto[id]; summary.removed.autoReview++; } });
+
+    const history = [];
+    (Array.isArray(state.quizHistory) ? state.quizHistory : []).forEach(function (rec) {
+      if (!rec || typeof rec !== 'object') { summary.removed.quizRecords++; return; }
+      if (!Array.isArray(rec.answers)) { history.push(rec); return; } // legacy summary-only record: nothing to resolve
+      const answers = [];
+      rec.answers.forEach(function (a) {
+        if (a && validIds[a.wordId]) answers.push(a.result === 'close' ? Object.assign({}, a, { result: 'wrong' }) : a);
+        else summary.removed.quizAnswers++;
+      });
+      if (!answers.length) { summary.removed.quizRecords++; return; }
+      const count = function (r) { return answers.filter(function (a) { return a.result === r; }).length; };
+      history.push(Object.assign({}, rec, {
+        answers: answers, total: answers.length,
+        correct: count('correct'), wrong: count('wrong'), skipped: count('skipped')
+      }));
+    });
+
+    const r = summary.removed;
+    const historyChanged = JSON.stringify(history) !== JSON.stringify(state.quizHistory);
+    const mapsChanged = r.known + r.manualReview + r.autoReview > 0;
+    state.known = known; state.manualReview = manual; state.autoReview = auto; state.quizHistory = history;
+    if (mapsChanged) { writeLS(LS_KEYS.known, known); persistReview(); }
+    if (historyChanged) writeLS(LS_KEYS.quizHistory, history);
+    summary.changed = mapsChanged || historyChanged;
+    return summary;
   }
 
   function loadAll() {
@@ -495,6 +554,9 @@
         buildSearchIndex();
         state.contentComplete = allParsed && docs.length > 0;
         state.freshLoad = false;
+        // Make stored progress match the content that actually loaded, BEFORE
+        // any screen renders, so no count is ever shown for a word that can't.
+        reconcileStoredData();
         emit('content-ready', { units: state.units });
       })
       .catch(function (err) {
@@ -504,34 +566,84 @@
       });
   }
 
-  /* ---------------- Known / Review ---------------- */
+  /* ---------------- Known / Review ----------------
+     ONE canonical review state per word (its stable wordId).
+     Two storage maps still exist for backward compatibility with saved
+     data — manualReview ("I flagged it") and autoReview ("I got it wrong
+     in a quiz") — but they are only ever changed through the functions
+     below, which keep two invariants:
+       1. a wordId is in AT MOST ONE of the two maps (no duplicates), and
+       2. "reviewing" is a single yes/no everywhere: needsReview(id).
+     The word card, the Review list, the statistics and the quiz weighting
+     all read needsReview(), so they can never disagree. Every change emits
+     ONE 'state-changed' event that the screens listen to. */
   function isKnown(wordId) { return !!state.known[wordId]; }
   function isManualReview(wordId) { return !!state.manualReview[wordId]; }
   function isAutoReview(wordId) { return !!state.autoReview[wordId]; }
   function needsReview(wordId) { return isManualReview(wordId) || isAutoReview(wordId); }
+  function getReviewSource(wordId) { return isManualReview(wordId) ? 'manual' : (isAutoReview(wordId) ? 'auto' : null); }
+
+  function persistReview() {
+    writeLS(LS_KEYS.manualReview, state.manualReview);
+    writeLS(LS_KEYS.autoReview, state.autoReview);
+  }
+
+  // The single review switch used by the Review / Unreview control.
+  //   on  → flagged (as manual) unless it is already in review
+  //   off → ALL review state for the word is cleared (manual AND auto)
+  function setReview(wordId, val) {
+    if (val) {
+      if (needsReview(wordId)) return; // already in review: never create a duplicate record
+      state.manualReview[wordId] = true;
+    } else {
+      delete state.manualReview[wordId];
+      delete state.autoReview[wordId];
+    }
+    persistReview();
+    emit('state-changed', { wordId: wordId, kind: 'review' });
+  }
+  function toggleReview(wordId) { setReview(wordId, !needsReview(wordId)); }
+
+  // Kept for API compatibility: the manual toggle IS the canonical toggle.
+  function setManualReview(wordId, val) { setReview(wordId, val); }
+  function toggleManualReview(wordId) { toggleReview(wordId); }
+
+  // Quiz-driven flag. Never duplicates a manual flag; clearing only touches
+  // the auto record.
+  function setAutoReview(wordId, val) {
+    if (val) {
+      if (needsReview(wordId)) return;
+      state.autoReview[wordId] = true;
+    } else {
+      if (!state.autoReview[wordId]) return;
+      delete state.autoReview[wordId];
+    }
+    persistReview();
+    emit('state-changed', { wordId: wordId, kind: 'autoReview' });
+  }
+
+  // Marking a word learned (or answering it correctly) makes its quiz-made
+  // review flag obsolete. A flag the user set by hand stays: it's theirs.
+  function clearObsoleteAutoReview(wordIds) {
+    let changed = false;
+    wordIds.forEach(function (id) { if (state.autoReview[id]) { delete state.autoReview[id]; changed = true; } });
+    if (changed) writeLS(LS_KEYS.autoReview, state.autoReview);
+    return changed;
+  }
 
   function setKnown(wordId, val) {
     if (val) state.known[wordId] = true; else delete state.known[wordId];
     writeLS(LS_KEYS.known, state.known);
-    emit('state-changed', { wordId: wordId, kind: 'known' });
-  }
-  function setManualReview(wordId, val) {
-    if (val) state.manualReview[wordId] = true; else delete state.manualReview[wordId];
-    writeLS(LS_KEYS.manualReview, state.manualReview);
-    emit('state-changed', { wordId: wordId, kind: 'manualReview' });
-  }
-  function setAutoReview(wordId, val) {
-    if (val) state.autoReview[wordId] = true; else delete state.autoReview[wordId];
-    writeLS(LS_KEYS.autoReview, state.autoReview);
-    emit('state-changed', { wordId: wordId, kind: 'autoReview' });
+    const reviewChanged = val ? clearObsoleteAutoReview([wordId]) : false;
+    emit('state-changed', { wordId: wordId, kind: 'known', reviewChanged: reviewChanged });
   }
   function toggleKnown(wordId) { setKnown(wordId, !isKnown(wordId)); }
-  function toggleManualReview(wordId) { setManualReview(wordId, !isManualReview(wordId)); }
 
   function setGroupKnown(wordIds, val) {
     wordIds.forEach(function (id) { if (val) state.known[id] = true; else delete state.known[id]; });
     writeLS(LS_KEYS.known, state.known);
-    emit('state-changed', { kind: 'group-known', wordIds: wordIds });
+    const reviewChanged = val ? clearObsoleteAutoReview(wordIds) : false;
+    emit('state-changed', { kind: 'group-known', wordIds: wordIds, reviewChanged: reviewChanged });
   }
   function getGroupTriState(wordIds) {
     let count = 0;
@@ -539,6 +651,29 @@
     if (count === 0) return 'unchecked';
     if (count === wordIds.length) return 'checked';
     return 'indeterminate';
+  }
+
+  // Every word that is in review AND actually exists in the loaded content.
+  // The one place the Review list and every count come from.
+  function getReviewWords() {
+    const out = [];
+    state.units.forEach(function (unit) {
+      unit.lessons.forEach(function (lesson) {
+        lesson.sections.forEach(function (section) {
+          section.groups.forEach(function (group, gi) {
+            group.words.forEach(function (w) {
+              if (!needsReview(w.wordId)) return;
+              out.push({
+                wordId: w.wordId, word: w.word, meaning: w.meaning, pos: w.pos || null,
+                unit: unit.unit, lessons: lesson.lessons, type: section.type,
+                groupIdx: gi, groupTitle: group.title
+              });
+            });
+          });
+        });
+      });
+    });
+    return out;
   }
 
   /* ---------------- Answer Checking ---------------- */
@@ -687,10 +822,19 @@
     if (!state.quiz) return null;
     const q = state.quiz.words[state.quiz.index];
     if (!q) return null;
-    const result = checkAnswer(userAnswer, q.word);
-    if (result === 'correct') state.quiz.correct++;
-    else if (result === 'skipped') state.quiz.skipped++;
-    else { state.quiz.wrong++; setAutoReview(q.wordId, true); }
+    const checked = checkAnswer(userAnswer, q.word);
+    // A near-miss ("close") still counts as wrong; it is stored as 'wrong' so
+    // the counters and the wrong-words list can never disagree.
+    const result = checked === 'close' ? 'wrong' : checked;
+    if (result === 'correct') {
+      state.quiz.correct++;
+      if (clearObsoleteAutoReview([q.wordId])) emit('state-changed', { wordId: q.wordId, kind: 'autoReview' });
+    } else if (result === 'skipped') {
+      state.quiz.skipped++;
+    } else {
+      state.quiz.wrong++;
+      setAutoReview(q.wordId, true);
+    }
 
     state.quiz.answers.push({ wordId: q.wordId, userAnswer: userAnswer, correctWord: q.word, meaning: q.meaning, result: result });
     // Note: no 'quiz-answer' reveal event anymore — the correct word must
@@ -730,8 +874,7 @@
     }
     // Full per-attempt record — kept (not just the aggregate counts) so a
     // past quiz can be reopened later and show exactly which words were
-    // wrong/skipped, per "كل كويز يكون مخزن عليه الغلطات والكلمات الي
-    // عملتلها skip" — see UI's quiz-history list + quiz detail screen.
+    // wrong/skipped — see the quiz-history list + quiz detail screen.
     const record = {
       id: 'q_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
       ts: Date.now(), mode: q.mode, ref: q.ref, total: q.words.length,
@@ -812,7 +955,6 @@
     // Per content type (vocabulary, synonyms_antonyms, idioms, derivatives,
     // and any future/unknown type): { total, known, progress }.
     const byType = {};
-    const reviewWords = [];
     state.units.forEach(function (unit) {
       unit.lessons.forEach(function (lesson) {
         lesson.sections.forEach(function (section) {
@@ -825,13 +967,6 @@
               if (section.type === 'vocabulary') {
                 vocabTotal++;
                 if (state.known[w.wordId]) vocabKnown++;
-              }
-              if (state.manualReview[w.wordId] || state.autoReview[w.wordId]) {
-                reviewWords.push({
-                  wordId: w.wordId, word: w.word, meaning: w.meaning, pos: w.pos || null,
-                  unit: unit.unit, lessons: lesson.lessons, type: section.type,
-                  groupIdx: gi, groupTitle: group.title
-                });
               }
             });
           });
@@ -846,7 +981,7 @@
       byType: byType,
       vocabulary: { total: vocabTotal, known: vocabKnown, progress: vocabTotal > 0 ? vocabKnown / vocabTotal : 0 },
       overall: { total: overallTotal, known: overallKnown, progress: overallTotal > 0 ? overallKnown / overallTotal : 0 },
-      reviewWords: reviewWords,
+      reviewWords: getReviewWords(),
       recentQuizzes: recent
     };
   }
@@ -894,15 +1029,23 @@
     } catch (e) {}
   })();
 
-  /* ---------------- Theme color (Settings: 8 accents) ---------------- */
+  /* ---------------- Theme color (Settings: 8 accents + default) ---------------- */
+  // Returns a palette name, or 'default' when no accent is picked.
   function getThemeColor() {
-    return THEME_COLORS.indexOf(state.themeColor) !== -1 ? state.themeColor : 'green';
+    return state.themeColor && THEME_COLORS.indexOf(state.themeColor) !== -1 ? state.themeColor : DEFAULT_COLOR;
   }
+  // Accepts a palette name, or 'default' to go back to the multi-color look.
   function setThemeColor(color) {
-    if (THEME_COLORS.indexOf(color) === -1) return;
-    state.themeColor = color;
-    writeLS(LS_KEYS.themeColor, color);
-    emit('theme-color-changed', color);
+    if (color === DEFAULT_COLOR) {
+      state.themeColor = null;
+      try { localStorage.removeItem(LS_KEYS.themeColor); } catch (e) {}
+    } else if (THEME_COLORS.indexOf(color) !== -1) {
+      state.themeColor = color;
+      writeLS(LS_KEYS.themeColor, color);
+    } else {
+      return;
+    }
+    emit('theme-color-changed', getThemeColor());
   }
 
   /* ---------------- Keep screen awake (Settings) ---------------- */
@@ -924,7 +1067,7 @@
   /* ---------------- Local data: export / import / delete-all ----------------
      Everything the app stores is plain JSON in localStorage, so this is a
      straight dump/restore of the known keys — used by the Settings screen's
-     "استخراج / استيراد / حذف كل البيانات" buttons. */
+     Export / Import / Delete All Data buttons. */
   function exportAllData() {
     return {
       appVersion: 1,               // backup FORMAT version (unchanged)
@@ -951,12 +1094,17 @@
       if (isPlainObject(obj.autoReview)) { state.autoReview = obj.autoReview; writeLS(LS_KEYS.autoReview, state.autoReview); applied = true; }
       if (Array.isArray(obj.quizHistory)) { state.quizHistory = obj.quizHistory.slice(-40); writeLS(LS_KEYS.quizHistory, state.quizHistory); applied = true; }
       const themeChanged = THEME_PREFS.indexOf(obj.theme) !== -1;
-      const colorChanged = THEME_COLORS.indexOf(obj.themeColor) !== -1;
+      const importedColor = obj.themeColor === DEFAULT_COLOR ? null : normalizeColor(obj.themeColor);
+      const colorChanged = obj.themeColor === DEFAULT_COLOR || importedColor !== null;
       if (themeChanged) { state.theme = obj.theme; writeLS(LS_KEYS.theme, state.theme); applied = true; }
-      if (colorChanged) { state.themeColor = obj.themeColor; writeLS(LS_KEYS.themeColor, state.themeColor); applied = true; }
+      if (colorChanged) {
+        state.themeColor = importedColor;
+        if (importedColor) writeLS(LS_KEYS.themeColor, importedColor); else { try { localStorage.removeItem(LS_KEYS.themeColor); } catch (e) {} }
+        applied = true;
+      }
       if (typeof obj.keepAwake === 'boolean') { state.keepAwake = obj.keepAwake; writeLS(LS_KEYS.keepAwake, state.keepAwake); applied = true; }
-      // No pruning here: a backup may hold progress for words this build
-      // doesn't ship (e.g. exported from another model version) — keep it.
+      // Same rule as at startup: stored progress must match the content.
+      reconcileStoredData();
       if (themeChanged) { emit('theme-preference-changed', getThemePreference()); emit('theme-changed', getTheme()); }
       if (colorChanged) emit('theme-color-changed', getThemeColor());
       if (!applied) return false;
@@ -972,7 +1120,7 @@
     state.autoReview = {};
     state.quizHistory = [];
     state.theme = null;
-    state.themeColor = 'green';
+    state.themeColor = null;
     state.keepAwake = false;
     Object.keys(LS_KEYS).forEach(function (k) {
       try { localStorage.removeItem(LS_KEYS[k]); } catch (e) {}
@@ -990,14 +1138,14 @@
     getMissingSections: function () { return state.missingSections.slice(); },
     getTheme: getTheme, getThemePreference: getThemePreference, setTheme: setTheme,
     getAppVersionInfo: function () { return { current: versionInfo.current, previous: versionInfo.previous, changed: versionInfo.changed, history: readAppMeta().history }; },
-    pruneOrphanedProgress: pruneOrphanedProgress,
+    reconcileStoredData: reconcileStoredData, getReviewWords: getReviewWords, getReviewSource: getReviewSource,
     getThemeColor: getThemeColor, setThemeColor: setThemeColor, getThemeColors: function () { return THEME_COLORS.slice(); },
     getKeepAwake: getKeepAwake, setKeepAwake: setKeepAwake,
     getQuizHistory: function () { return state.quizHistory.slice(); },
     getQuizRecord: getQuizRecord,
     exportAllData: exportAllData, importAllData: importAllData, resetAllData: resetAllData,
     isKnown: isKnown, isManualReview: isManualReview, isAutoReview: isAutoReview, needsReview: needsReview,
-    toggleKnown: toggleKnown, toggleManualReview: toggleManualReview,
+    toggleKnown: toggleKnown, toggleManualReview: toggleManualReview, toggleReview: toggleReview, setReview: setReview, setAutoReview: setAutoReview,
     setKnown: setKnown, setGroupKnown: setGroupKnown, getGroupTriState: getGroupTriState,
     checkAnswer: checkAnswer, normalize: normalize, levenshtein: levenshtein,
     startFullQuiz: startFullQuiz, startSelectedQuiz: startSelectedQuiz, canStartSelectedQuiz: canStartSelectedQuiz,
