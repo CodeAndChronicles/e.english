@@ -1,24 +1,25 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>E.English — تطبيق مذاكرة المفردات الإنجليزية</title>
-  <meta name="description" content="E.English: طبّق واذاكر مفردات ومصطلحات ومرادفات اللغة الإنجليزية أونلاين وأوفلاين، مع كويزات تفاعلية وتتبّع تقدّم لكل وحدة ودرس." />
-  <meta name="theme-color" content="#1FA971" id="meta-theme-color" />
+  <title>E.English — Learn English Vocabulary Online &amp; Offline</title>
+  <meta name="description" content="E.English helps you study English vocabulary, synonyms and antonyms, idioms and phrasal verbs, and word derivatives — with quizzes, review lists and progress tracking that work offline." />
+  <meta name="theme-color" content="#F4F4F4" id="meta-theme-color" />
   <link rel="icon" type="image/png" href="Ui/Logo.png" />
   <link rel="apple-touch-icon" href="Ui/Logo.png" />
   <link rel="manifest" href="manifest.webmanifest" />
 
   <!-- Open Graph / social preview -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="E.English" />
-  <meta property="og:description" content="طبّق واذاكر مفردات ومصطلحات ومرادفات اللغة الإنجليزية أونلاين وأوفلاين، مع كويزات تفاعلية وتتبّع تقدّم لكل وحدة ودرس." />
+  <meta property="og:site_name" content="E.English" />
+  <meta property="og:title" content="E.English — Learn English Vocabulary" />
+  <meta property="og:description" content="Study English vocabulary, synonyms and antonyms, idioms and phrasal verbs, and derivatives — with quizzes, review lists and progress tracking, online or offline." />
   <meta property="og:image" content="Ui/Logo.png" />
-  <meta property="og:locale" content="ar_AR" />
+  <meta property="og:locale" content="en_US" />
   <meta name="twitter:card" content="summary" />
-  <meta name="twitter:title" content="E.English" />
-  <meta name="twitter:description" content="مذاكرة مفردات إنجليزي أونلاين وأوفلاين، بكويزات وتتبّع تقدّم." />
+  <meta name="twitter:title" content="E.English — Learn English Vocabulary" />
+  <meta name="twitter:description" content="Study English vocabulary with quizzes, review lists and progress tracking — online or offline." />
   <meta name="twitter:image" content="Ui/Logo.png" />
 
   <link rel="stylesheet" href="CSS/root.css" />
@@ -31,7 +32,7 @@
 </head>
 <body>
   <div id="app">
-    <button id="theme-toggle-btn" class="theme-toggle-btn" aria-label="تبديل الثيم">
+    <button id="theme-toggle-btn" class="theme-toggle-btn" aria-label="Toggle light / dark mode">
     </button>
     <nav id="side-nav" class="side-nav" hidden>
       <img src="Ui/Logo.png" alt="" class="side-nav-logo" />
@@ -46,6 +47,9 @@
       </button>
       <button class="nav-btn" data-nav="info">
         <span>Info</span>
+      </button>
+      <button class="nav-btn" data-nav="readme">
+        <span>README</span>
       </button>
     </nav>
     <main id="screen-container"></main>
@@ -62,6 +66,9 @@
       <button class="nav-btn" data-nav="info">
         <span>Info</span>
       </button>
+      <button class="nav-btn" data-nav="readme">
+        <span>README</span>
+      </button>
     </nav>
   </div>
 
@@ -70,6 +77,7 @@
   <script src="JavaScript/ux.js"></script>
   <script src="JavaScript/ui.js"></script>
   <script src="JavaScript/settings.js"></script>
+  <script src="JavaScript/readme.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       UI.init();
