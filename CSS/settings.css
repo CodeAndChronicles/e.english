@@ -1,28 +1,44 @@
 /* settings.css — Settings screen only (theme picker, keep-awake, data
-   actions) + the toast used to confirm export/import/delete. Kept in its
-   own file since Settings is a new, self-contained feature area — see
-   JavaScript/settings.js for the matching markup. */
+   actions) + the toast used to confirm export/import/delete — see
+   JavaScript/settings.js for the matching markup.
+
+   Type scale used here (so the page has a clear hierarchy):
+     section title 18px/700 · row title 15.5px/600 · description 13.5px muted
+     · control labels 13.5px. Spacing runs on an 8px rhythm: rows 16px,
+     cards 24px, sections 32px. Touch targets are >= 44px. */
+
+/* ---- Section titles + rhythm ---- */
+.settings-section-title {
+  display: flex; align-items: center; gap: var(--sp-xs);
+  margin: 0 0 var(--sp-sm); padding-inline: var(--sp-2xs);
+  font-size: var(--font-size-lg); font-weight: var(--fw-bold); line-height: 1.3;
+}
+.settings-section-title .icon { width: 20px; height: 20px; color: var(--color-text-muted); }
+.settings-advanced { margin-top: var(--sp-xs); }
 
 .settings-card {
   display: flex; flex-direction: column;
-  padding: var(--sp-xs) var(--sp-lg);
-  margin-bottom: var(--sp-lg);
+  padding: var(--sp-2xs) var(--sp-lg);
+  margin-bottom: var(--sp-xl);
+  border-radius: var(--r-lg);
 }
 .settings-row {
   display: flex; align-items: center; gap: var(--sp-md);
   padding: var(--sp-md) 0;
+  min-height: 72px;
   border-bottom: 1px solid var(--color-border);
 }
 .settings-row:last-child { border-bottom: none; }
 .settings-row-block { flex-wrap: wrap; }
 .settings-row-icon {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 38px; height: 38px; border-radius: var(--r-md);
+  width: 40px; height: 40px; border-radius: var(--r-md);
   background: var(--tone-bg, var(--color-mint)); color: var(--tone, var(--color-ink)); flex-shrink: 0;
 }
+.settings-row-icon .icon { width: 20px; height: 20px; }
 .settings-row-text { flex: 1; min-width: 0; }
-.settings-row-title { font-weight: var(--fw-medium); }
-.settings-row-sub { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px; }
+.settings-row-title { font-size: var(--font-size-md); font-weight: var(--fw-medium); line-height: 1.3; }
+.settings-row-sub { font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: 2px; line-height: 1.45; }
 
 /* ---- Light / Dark / System segmented control ---- */
 .segmented {
@@ -31,28 +47,30 @@
 }
 .segmented-btn {
   padding: var(--sp-xs) var(--sp-md); border-radius: var(--r-pill);
+  min-height: 44px;
   font-size: var(--font-size-sm); font-weight: var(--fw-medium);
   color: var(--color-text-muted);
 }
+.segmented-btn:hover:not(.active) { color: var(--color-text); }
 .segmented-btn.active { background: var(--color-primary); color: var(--color-primary-contrast); }
 .segmented-btn.active .segmented-sub { opacity: 0.9; }
 .segmented-btn { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
-.segmented-icon { font-size: 16px; }
+.segmented-icon { width: 18px; height: 18px; }
 .segmented-sub { font-family: var(--font-en); font-size: 10px; font-weight: var(--fw-regular); opacity: 0.8; line-height: 1.2; }
 .segmented-btn:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
 /* Full-width variant: three equal buttons under the row title. */
-.settings-row-flush { border-bottom: none; padding-bottom: var(--sp-sm); }
+.settings-row-flush { border-bottom: none; padding-bottom: var(--sp-sm); min-height: 0; }
 .settings-seg-wrap { padding-bottom: var(--sp-md); border-bottom: 1px solid var(--color-border); }
-.segmented-full { display: flex; width: 100%; max-width: 440px; }
+.segmented-full { display: flex; width: 100%; max-width: 440px; padding: 4px; }
 .segmented-full .segmented-btn { flex: 1; min-width: 0; padding: var(--sp-xs) var(--sp-xs); white-space: nowrap; }
 
 /* ---- Accent color picker: Default + two groups of four ---- */
 .theme-color-picker { width: 100%; display: flex; flex-direction: column; gap: var(--sp-sm); padding-bottom: var(--sp-md); }
-.theme-color-group-title { font-size: var(--font-size-xs); font-weight: var(--fw-medium); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 var(--sp-2xs); }
+.theme-color-group-title { font-size: var(--font-size-xs); font-weight: var(--fw-bold); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 var(--sp-xs); }
 .theme-color-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-xs); width: 100%; }
 .theme-color-swatch {
   display: flex; align-items: center; gap: var(--sp-xs); width: 100%;
-  padding: var(--sp-sm) var(--sp-md);
+  padding: var(--sp-sm) var(--sp-md); min-height: 48px;
   border: 2px solid var(--color-border);
   border-radius: var(--r-md);
   background: var(--color-surface);
@@ -61,7 +79,7 @@
 .theme-color-swatch:hover { background: var(--color-surface-alt); }
 .theme-color-swatch:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
 .theme-color-swatch.active { border-color: var(--color-ink); background: var(--color-mint); }
-.swatch-dot { width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+.swatch-dot { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
 /* Swatches show each palette's own light-mode fill. */
 .swatch-midnight { background: #24407A; }
 .swatch-plum { background: #6E2F63; }
@@ -76,23 +94,24 @@
 .swatch-label { font-size: var(--font-size-sm); }
 
 /* ---- Toggle switch (keep screen awake) ---- */
-.switch { position: relative; display: inline-block; width: 46px; height: 27px; flex-shrink: 0; cursor: pointer; }
+.switch { position: relative; display: inline-block; width: 52px; height: 32px; flex-shrink: 0; cursor: pointer; }
+.switch::before { content: ''; position: absolute; inset: -6px -4px; } /* 44px touch area */
 .switch-track {
   position: absolute; inset: 0; border-radius: var(--r-pill);
   background: var(--color-disabled);
 }
 .switch-track::after {
   content: ''; position: absolute; top: 3px; left: 3px;
-  width: 21px; height: 21px; border-radius: 50%; background: #fff;
+  width: 26px; height: 26px; border-radius: 50%; background: #fff;
   box-shadow: var(--shadow-sm);
   transition: transform var(--t-fast) var(--ease-out);
 }
 .switch-input:checked ~ .switch-track { background: var(--color-primary); }
-.switch-input:checked ~ .switch-track::after { transform: translateX(19px); }
+.switch-input:checked ~ .switch-track::after { transform: translateX(20px); }
 .switch-input:focus-visible ~ .switch-track { outline: 2px solid var(--color-ink); outline-offset: 2px; }
 
 /* ---- Data action buttons ---- */
-.settings-action-btn { width: 100%; margin: var(--sp-xs) 0; justify-content: flex-start; }
+.settings-action-btn { width: 100%; min-height: 52px; margin: var(--sp-xs) 0; justify-content: flex-start; font-size: var(--font-size-md); }
 .settings-action-btn:first-of-type { margin-top: var(--sp-md); }
 .settings-action-btn:last-of-type { margin-bottom: var(--sp-md); }
 
@@ -120,7 +139,7 @@
 /* ---- Advanced: collapsed disclosure ---- */
 .advanced-toggle {
   display: flex; align-items: center; gap: var(--sp-sm);
-  width: 100%; padding: var(--sp-sm) var(--sp-lg);
+  width: 100%; padding: var(--sp-sm) var(--sp-lg); min-height: 56px;
   margin-bottom: var(--sp-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -130,7 +149,7 @@
 }
 .advanced-toggle:hover { background: var(--color-surface-alt); }
 .advanced-toggle:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
-.advanced-toggle-icon { color: var(--tone-slate); }
+.advanced-toggle-icon { width: 20px; height: 20px; color: var(--tone-slate); }
 .advanced-toggle-label { flex: 1; text-align: start; }
 .advanced-chevron { color: var(--color-text-muted); transform: rotate(-90deg); transition: transform var(--t-fast) var(--ease-out); }
 .advanced-toggle.open { margin-bottom: var(--sp-sm); }
@@ -138,7 +157,8 @@
 .advanced-panel[hidden] { display: none; }
 
 /* ---- Advanced: device info ---- */
-.device-info-head { display: flex; align-items: center; gap: var(--sp-xs); padding: var(--sp-md) 0 var(--sp-xs); }
+.device-info-head { display: flex; align-items: center; gap: var(--sp-xs); padding: var(--sp-md) 0 var(--sp-xs); font-size: var(--font-size-md); }
+.device-info-head .icon { width: 20px; height: 20px; color: var(--color-text-muted); }
 .device-info-rows { display: flex; flex-direction: column; }
 .device-info-row {
   display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-md);
@@ -146,6 +166,7 @@
   font-size: var(--font-size-sm);
 }
 .device-info-row:last-child { border-bottom: none; }
+.device-info-row > :first-child { color: var(--color-text-muted); }
 .device-info-value { font-weight: var(--fw-medium); direction: ltr; text-align: end; overflow-wrap: anywhere; }
 
 /* Desktop: two cards side by side use the wide space; toast clears the
@@ -153,4 +174,16 @@
 @media (min-width: 1024px) {
   .settings-toast { bottom: var(--sp-xl); }
   .settings-action-btn { width: auto; min-width: 280px; }
+}
+
+/* ---- Phones: tighter card padding, controls never overflow ---- */
+@media (max-width: 479px) {
+  .settings-card { padding-inline: var(--sp-md); }
+  .settings-row { gap: var(--sp-sm); }
+  .settings-row-icon { width: 36px; height: 36px; }
+  .segmented-full { max-width: none; }
+  .settings-section-title { font-size: var(--font-size-md); }
+}
+@media (max-width: 359px) {
+  .theme-color-swatch { padding-inline: var(--sp-sm); gap: 6px; }
 }
