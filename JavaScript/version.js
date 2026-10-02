@@ -17,7 +17,7 @@
        untouched by a version change. */
 (function (root) {
   'use strict';
-  root.EE_MODEL_VERSION = '7';
+  root.EE_MODEL_VERSION = '8';
   // Every cache this app ever creates starts with this prefix, so cleanup
   // can be scoped to "our" caches and never touches anything else on the
   // same origin.

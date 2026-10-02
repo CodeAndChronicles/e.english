@@ -115,6 +115,7 @@
         opt.sub ? h('span', { class: 'segmented-sub', text: opt.sub }) : null
       ]);
       btn.setAttribute('aria-pressed', opt.value === activeValue ? 'true' : 'false');
+      btn.dataset.value = opt.value;
       if (opt.title) btn.setAttribute('title', opt.title);
       wrap.appendChild(btn);
     });
@@ -140,7 +141,7 @@
     screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Settings' })]));
 
     /* ---- Appearance ---- */
-    screen.appendChild(h('h2', { class: 'section-title-flat' }, [icon('palette'), h('span', { text: 'Appearance' })]));
+    screen.appendChild(h('h2', { class: 'settings-section-title' }, [icon('palette'), h('span', { text: 'Appearance' })]));
     const appearanceCard = h('div', { class: 'card settings-card' });
 
     const themeRow = h('div', { class: 'settings-row settings-row-block' }, [
@@ -161,7 +162,7 @@
       UX.getThemePreference(),
       function (val) { UX.setTheme(val); }
     );
-    themeSeg.classList.add('segmented-full');
+    themeSeg.classList.add('segmented-full', 'segmented-theme');
     themeSeg.setAttribute('role', 'group');
     themeSeg.setAttribute('aria-label', 'Theme mode');
     appearanceCard.appendChild(h('div', { class: 'settings-seg-wrap' }, [themeSeg]));
@@ -173,6 +174,7 @@
         h('div', { class: 'settings-row-sub', text: 'Default keeps the app multi-colored. Pick a palette to use one accent everywhere.' })
       ])
     ]);
+    colorRow.classList.add('settings-row-flush');
     appearanceCard.appendChild(colorRow);
 
     const colorPicker = h('div', { class: 'theme-color-picker', role: 'group', 'aria-label': 'Accent color' });
@@ -245,8 +247,7 @@
       h('span', { class: 'advanced-toggle-label', text: 'Advanced' }),
       icon('chevron-down', 'advanced-chevron')
     ]);
-    screen.appendChild(advancedToggle);
-    screen.appendChild(advancedPanel);
+    screen.appendChild(h('div', { class: 'settings-advanced' }, [advancedToggle, advancedPanel]));
 
     /* ---- Data ---- */
     const dataCard = h('div', { class: 'card settings-card' });
@@ -355,6 +356,17 @@
     }
     if (advancedOpen) fillStorageRow();
   }
+
+  // ONE theme preference (UX.getThemePreference), two controls: this selector
+  // and the floating button. Whenever the preference changes — from either —
+  // the selector (if Settings is open) just reflects it; it keeps no state.
+  UX.on('theme-preference-changed', function (pref) {
+    document.querySelectorAll('.segmented-theme .segmented-btn').forEach(function (b) {
+      const on = b.dataset.value === pref;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  });
 
   global.UI = global.UI || {};
   global.UI.renderSettings = render;

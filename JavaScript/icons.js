@@ -68,7 +68,9 @@
     'file-text': '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/> <path d="M14 2v5a1 1 0 0 0 1 1h5"/> <path d="M10 9H8"/> <path d="M16 13H8"/> <path d="M16 17H8"/>',
     'book-open-text': '<path d="M12 5v16"/> <path d="M16 13h2"/> <path d="M16 9h2"/> <path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/> <path d="M6 13h2"/> <path d="M6 9h2"/>',
     'chevron-down': '<path d="m6 9 6 6 6-6"/>',
-    'arrow-left': '<path d="m12 19-7-7 7-7"/> <path d="M19 12H5"/>'
+    'arrow-left': '<path d="m12 19-7-7 7-7"/> <path d="M19 12H5"/>',
+    'equal-approximately': '<path d="M5 15a6.5 6.5 0 0 1 7 0 6.5 6.5 0 0 0 7 0"/> <path d="M5 9a6.5 6.5 0 0 1 7 0 6.5 6.5 0 0 0 7 0"/>',
+    timer: '<line x1="10" x2="14" y1="2" y2="2"/> <line x1="12" x2="15" y1="14" y2="11"/> <circle cx="12" cy="14" r="8"/>'
   };
 
   // Old name -> current Lucide name.

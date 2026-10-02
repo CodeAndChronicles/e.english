@@ -126,13 +126,32 @@
     });
   }
 
+  /* ---------------- Quiz engine + saved history ----------------
+     All quiz LOGIC (duration, selection, answer checking, scoring, result
+     records) lives in JavaScript/quiz-engine.js, loaded before this file.
+     ux.js only keeps the state, saves history and updates Review. */
+  const Engine = global.QuizEngine;
+  if (!Engine) console.error('[E.English] quiz-engine.js did not load — quizzes are unavailable.');
+  const QUIZ_HISTORY_LIMIT = 40;
+  // Every stored record is upgraded to the current shape (and malformed ones
+  // dropped). Each record is a self-contained snapshot, so it never depends
+  // on the lesson files again.
+  function normalizeHistory(list) {
+    const out = [];
+    (Array.isArray(list) ? list : []).forEach(function (rec, i) {
+      const n = Engine ? Engine.normalizeRecord(rec, i) : null;
+      if (n) out.push(n);
+    });
+    return out.slice(-QUIZ_HISTORY_LIMIT);
+  }
+
   /* ---------------- State ---------------- */
   const state = {
     units: [],
     known: readLS(LS_KEYS.known, {}),
     manualReview: readLS(LS_KEYS.manualReview, {}),
     autoReview: readLS(LS_KEYS.autoReview, {}),
-    quizHistory: readLS(LS_KEYS.quizHistory, []),
+    quizHistory: normalizeHistory(readLS(LS_KEYS.quizHistory, [])),
     currentScreen: 'home',
     quiz: null,
     searchIndex: [],
@@ -147,6 +166,11 @@
     themeColor: normalizeColor(readLS(LS_KEYS.themeColor, null)),
     keepAwake: readLS(LS_KEYS.keepAwake, false)
   };
+  // History saved by an earlier version is upgraded once, in storage too.
+  (function migrateQuizHistory() {
+    const raw = readLS(LS_KEYS.quizHistory, []);
+    if (JSON.stringify(raw) !== JSON.stringify(state.quizHistory)) writeLS(LS_KEYS.quizHistory, state.quizHistory);
+  })();
   // An accent saved by an earlier version (green, blue, ...) is mapped to its
   // nearest new palette (or the default look) once, and the stored value updated.
   (function migrateStoredColor() {
@@ -440,20 +464,21 @@
 
   /* ---------------- LocalStorage ↔ content reconciliation ----------------
      Runs on every normal load (and after an import), once the content has
-     loaded COMPLETELY. It makes what is stored match what the UI can show:
+     loaded COMPLETELY. It makes the saved WORD-STATE match what the UI can
+     show:
        • known / manualReview / autoReview: entries whose word id no longer
-         exists in the content are removed;
-       • a word can't be in both review maps (manual wins, duplicate dropped);
-       • quiz history: answers that point to words that don't exist are
-         removed, each record's totals are recomputed from the answers that
-         remain (so "5 wrong" can never be stored when only 3 resolve), and a
-         record with nothing valid left is dropped; a legacy 'close' answer is
-         normalised to 'wrong'.
-     Valid progress is never touched. If any content file failed to load, the
-     content is incomplete, so NOTHING is removed (a missing file must not
-     look like "these words were deleted"). Returns a summary of what changed. */
+         exists in the content are removed (a quiz-made review entry keeps
+         its stored reason: 'wrong' | 'skipped');
+       • a word can't be in both review maps (manual wins, duplicate dropped).
+     Quiz history is deliberately NOT pruned by word id any more: every
+     history record stores its own snapshot of each question (prompt,
+     expected answer, your answer, result, points), so it still shows exactly
+     what happened after the lesson content changes, and its counts always
+     match the rows it displays. Malformed history records are dropped.
+     Valid progress is never touched. If any content file failed to load,
+     the content is incomplete, so NOTHING is removed. Returns a summary. */
   function reconcileStoredData() {
-    const summary = { ran: false, removed: { known: 0, manualReview: 0, autoReview: 0, quizAnswers: 0, quizRecords: 0 } };
+    const summary = { ran: false, removed: { known: 0, manualReview: 0, autoReview: 0, quizRecords: 0 } };
     if (!state.contentComplete || !state.units.length) return summary;
     summary.ran = true;
 
@@ -468,35 +493,22 @@
       });
     });
 
-    function cleanMap(map, name) {
+    function cleanMap(map, name, keepReasons) {
       if (!isPlainObject(map)) return {};
       const out = {};
       Object.keys(map).forEach(function (id) {
-        if (map[id] && validIds[id]) out[id] = true; else summary.removed[name]++;
+        if (map[id] && validIds[id]) out[id] = (keepReasons && (map[id] === 'wrong' || map[id] === 'skipped' || map[id] === 'quiz')) ? map[id] : true;
+        else summary.removed[name]++;
       });
       return out;
     }
     const known = cleanMap(state.known, 'known');
     const manual = cleanMap(state.manualReview, 'manualReview');
-    const auto = cleanMap(state.autoReview, 'autoReview');
+    const auto = cleanMap(state.autoReview, 'autoReview', true);
     Object.keys(auto).forEach(function (id) { if (manual[id]) { delete auto[id]; summary.removed.autoReview++; } });
 
-    const history = [];
-    (Array.isArray(state.quizHistory) ? state.quizHistory : []).forEach(function (rec) {
-      if (!rec || typeof rec !== 'object') { summary.removed.quizRecords++; return; }
-      if (!Array.isArray(rec.answers)) { history.push(rec); return; } // legacy summary-only record: nothing to resolve
-      const answers = [];
-      rec.answers.forEach(function (a) {
-        if (a && validIds[a.wordId]) answers.push(a.result === 'close' ? Object.assign({}, a, { result: 'wrong' }) : a);
-        else summary.removed.quizAnswers++;
-      });
-      if (!answers.length) { summary.removed.quizRecords++; return; }
-      const count = function (r) { return answers.filter(function (a) { return a.result === r; }).length; };
-      history.push(Object.assign({}, rec, {
-        answers: answers, total: answers.length,
-        correct: count('correct'), wrong: count('wrong'), skipped: count('skipped')
-      }));
-    });
+    const history = normalizeHistory(state.quizHistory);
+    summary.removed.quizRecords = (Array.isArray(state.quizHistory) ? state.quizHistory.length : 0) - history.length;
 
     const r = summary.removed;
     const historyChanged = JSON.stringify(history) !== JSON.stringify(state.quizHistory);
@@ -582,6 +594,14 @@
   function isAutoReview(wordId) { return !!state.autoReview[wordId]; }
   function needsReview(wordId) { return isManualReview(wordId) || isAutoReview(wordId); }
   function getReviewSource(wordId) { return isManualReview(wordId) ? 'manual' : (isAutoReview(wordId) ? 'auto' : null); }
+  // Why a word is in Review: 'manual' (flagged by hand), 'wrong' / 'skipped'
+  // (a quiz answer), 'quiz' (quiz-made, saved before reasons were stored).
+  function getReviewReason(wordId) {
+    if (isManualReview(wordId)) return 'manual';
+    const v = state.autoReview[wordId];
+    if (!v) return null;
+    return v === 'wrong' || v === 'skipped' ? v : 'quiz';
+  }
 
   function persistReview() {
     writeLS(LS_KEYS.manualReview, state.manualReview);
@@ -608,16 +628,25 @@
   function setManualReview(wordId, val) { setReview(wordId, val); }
   function toggleManualReview(wordId) { toggleReview(wordId); }
 
-  // Quiz-driven flag. Never duplicates a manual flag; clearing only touches
-  // the auto record.
-  function setAutoReview(wordId, val) {
+  // Quiz-driven flag. Never duplicates a manual flag (the learner's own flag
+  // wins); clearing only touches the quiz-made record. `val` is false, or the
+  // reason: 'wrong' | 'skipped' (any other truthy value is stored as 'quiz').
+  // Returns true when something changed. Does not save or emit — callers do,
+  // so a whole quiz can be applied with one write and one event.
+  function setAutoReviewQuiet(wordId, val) {
     if (val) {
-      if (needsReview(wordId)) return;
-      state.autoReview[wordId] = true;
-    } else {
-      if (!state.autoReview[wordId]) return;
-      delete state.autoReview[wordId];
+      if (isManualReview(wordId)) return false;
+      const reason = (val === 'wrong' || val === 'skipped') ? val : 'quiz';
+      if (state.autoReview[wordId] === reason) return false;
+      state.autoReview[wordId] = reason;
+      return true;
     }
+    if (!state.autoReview[wordId]) return false;
+    delete state.autoReview[wordId];
+    return true;
+  }
+  function setAutoReview(wordId, val) {
+    if (!setAutoReviewQuiet(wordId, val)) return;
     persistReview();
     emit('state-changed', { wordId: wordId, kind: 'autoReview' });
   }
@@ -676,55 +705,13 @@
     return out;
   }
 
-  /* ---------------- Answer Checking ---------------- */
-  function normalize(s) {
-    if (s == null) return '';
-    let t = String(s).toLowerCase().trim();
-    t = t.replace(/\s+/g, ' ');
-    t = t.replace(/[.,!?;:'"`~()\[\]{}<>،؛؟]+$/g, '');
-    return t;
-  }
-  function levenshtein(a, b) {
-    if (a === b) return 0;
-    const al = a.length, bl = b.length;
-    if (al === 0) return bl;
-    if (bl === 0) return al;
-    let prev = new Array(bl + 1);
-    let curr = new Array(bl + 1);
-    for (let j = 0; j <= bl; j++) prev[j] = j;
-    for (let i = 1; i <= al; i++) {
-      curr[0] = i;
-      for (let j = 1; j <= bl; j++) {
-        const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
-        curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
-      }
-      const tmp = prev; prev = curr; curr = tmp;
-    }
-    return prev[bl];
-  }
-  function thresholdFor(len) {
-    if (len <= 3) return 0;
-    if (len <= 5) return 1;
-    if (len <= 8) return 2;
-    return 3;
-  }
-  function checkAnswer(userAnswer, correctWord) {
-    const u = normalize(userAnswer);
-    const c = normalize(correctWord);
-    if (u === '') return 'skipped';
-    if (u === c) return 'correct';
-    const dist = levenshtein(u, c);
-    const maxAllowed = thresholdFor(c.length);
-    if (dist <= maxAllowed) return 'close';
-    return 'wrong';
-  }
-
-  /* ---------------- Quiz scoping ----------------
+  /* ---------------- Quiz (state + glue; the logic is in quiz-engine.js) ----------------
      Both quiz modes open from inside the current lesson's Vocabulary
-     section only — never a cross-unit/global quiz. */
-  const QUIZ_FULL_SECONDS = 1800;
-  const QUIZ_SELECTED_SECONDS = 900;
-
+     section only — never a cross-unit/global quiz.
+     state.quiz = { session, timerId, timeLeft }. `session` is plain data owned
+     by the engine (questions, answers, estimate, time limit). ux.js starts a
+     timer, forwards answers to the engine, applies the engine's Review rules
+     to the real Review state, and saves the finished record. */
   function collectVocabularyFor(unitNum, lessonKey) {
     const out = [];
     const unit = state.units.find(function (u) { return u.unit === unitNum; });
@@ -745,144 +732,121 @@
     return out;
   }
 
-  function shuffle(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
-    }
-    return a;
+  function quizContext() { return { isKnown: isKnown, needsReview: needsReview }; }
+
+  // What a quiz WOULD look like right now — shown on the launch buttons
+  // before starting: word count, estimated duration / range / time limit.
+  function getQuizPreview(unitNum, lessonKey, mode) {
+    const pool = Engine.poolForMode(collectVocabularyFor(unitNum, lessonKey), mode, quizContext());
+    const est = Engine.estimateDuration(Engine.buildQuestions(pool));
+    return Object.assign({ mode: mode, count: pool.length }, est);
   }
 
-  // ~70% of the sequence is drawn from the "needs review" pool and ~30%
-  // from "fresh", randomly interleaved. Every word in the pool is always
-  // included exactly once — the weighting only controls draw order.
-  function orderWithReviewWeighting(pool) {
-    const reviewPool = shuffle(pool.filter(function (w) { return needsReview(w.wordId); }));
-    const freshPool = shuffle(pool.filter(function (w) { return !needsReview(w.wordId); }));
-    const ordered = [];
-    let ri = 0, fi = 0;
-    while (ri < reviewPool.length || fi < freshPool.length) {
-      const reviewLeft = reviewPool.length - ri;
-      const freshLeft = freshPool.length - fi;
-      let takeReview;
-      if (reviewLeft <= 0) takeReview = false;
-      else if (freshLeft <= 0) takeReview = true;
-      else takeReview = Math.random() < 0.7;
-      if (takeReview) { ordered.push(reviewPool[ri]); ri++; }
-      else { ordered.push(freshPool[fi]); fi++; }
-    }
-    return ordered;
-  }
-
-  function startFullQuiz(unitNum, lessonKey) {
-    const pool = collectVocabularyFor(unitNum, lessonKey);
-    if (pool.length === 0) return false;
-    beginQuiz('full', orderWithReviewWeighting(pool), QUIZ_FULL_SECONDS, { unit: unitNum, lessonKey: lessonKey });
-    return true;
-  }
-
+  function startFullQuiz(unitNum, lessonKey) { return beginQuiz('full', { unit: unitNum, lessonKey: lessonKey }); }
   function canStartSelectedQuiz(unitNum, lessonKey) {
     return collectVocabularyFor(unitNum, lessonKey).some(function (w) { return isKnown(w.wordId); });
   }
+  function startSelectedQuiz(unitNum, lessonKey) { return beginQuiz('selected', { unit: unitNum, lessonKey: lessonKey }); }
 
-  function startSelectedQuiz(unitNum, lessonKey) {
-    const pool = collectVocabularyFor(unitNum, lessonKey).filter(function (w) { return isKnown(w.wordId); });
-    if (pool.length === 0) return false;
-    beginQuiz('selected', orderWithReviewWeighting(pool), QUIZ_SELECTED_SECONDS, { unit: unitNum, lessonKey: lessonKey });
+  function tickPayload() {
+    const q = state.quiz;
+    const limit = q.session.estimate.timeLimit;
+    return { timeLeft: q.timeLeft, timeLimit: limit, state: Engine.timerState(q.timeLeft, limit) };
+  }
+
+  function beginQuiz(mode, ref) {
+    if (!Engine) return false;
+    const questions = Engine.selectQuestions(collectVocabularyFor(ref.unit, ref.lessonKey), mode, quizContext());
+    if (questions.length === 0) return false;
+    if (state.quiz && state.quiz.timerId) clearInterval(state.quiz.timerId);
+    const session = Engine.createSession({ mode: mode, ref: ref, questions: questions, now: Date.now() });
+    state.quiz = { session: session, timerId: null, timeLeft: session.estimate.timeLimit };
+    emit('quiz-started', { mode: mode, total: questions.length, timeLeft: state.quiz.timeLeft, estimate: session.estimate });
+    emit('quiz-tick', tickPayload());
+    emit('quiz-question', currentQuizQuestion());
+
+    // The clock is the real time since the start (not "minus one per tick"),
+    // so a throttled background tab can't stretch the time limit.
+    state.quiz.timerId = setInterval(function () {
+      if (!state.quiz) return;
+      state.quiz.timeLeft = Engine.remainingSeconds(state.quiz.session, Date.now());
+      emit('quiz-tick', tickPayload());
+      if (state.quiz.timeLeft <= 0) finishQuiz(true);
+    }, 1000);
     return true;
   }
 
-  function beginQuiz(mode, words, seconds, ref) {
-    if (state.quiz && state.quiz.timerId) clearInterval(state.quiz.timerId);
-    state.quiz = {
-      mode: mode, words: words, index: 0, correct: 0, wrong: 0, skipped: 0,
-      answers: [], timeLeft: seconds, timerId: null, ref: ref
+  // Read-only view for the UI (it never touches the session directly).
+  function getCurrentQuiz() {
+    const q = state.quiz;
+    if (!q) return null;
+    const s = q.session;
+    return {
+      mode: s.mode, ref: s.ref, index: s.index, total: s.questions.length,
+      question: Engine.currentQuestion(s), questions: s.questions,
+      timeLeft: q.timeLeft, timeLimit: s.estimate.timeLimit, estimate: s.estimate,
+      timerState: Engine.timerState(q.timeLeft, s.estimate.timeLimit)
     };
-    emit('quiz-started', { mode: mode, total: words.length, timeLeft: seconds });
-    emit('quiz-tick', { timeLeft: state.quiz.timeLeft });
-    emit('quiz-question', currentQuizQuestion());
-
-    state.quiz.timerId = setInterval(function () {
-      if (!state.quiz) return;
-      state.quiz.timeLeft -= 1;
-      emit('quiz-tick', { timeLeft: state.quiz.timeLeft });
-      if (state.quiz.timeLeft <= 0) finishQuiz(true);
-    }, 1000);
   }
 
   function currentQuizQuestion() {
     if (!state.quiz) return null;
-    const q = state.quiz.words[state.quiz.index];
+    const s = state.quiz.session;
+    const q = Engine.currentQuestion(s);
     if (!q) return null;
-    return { index: state.quiz.index, total: state.quiz.words.length, meaning: q.meaning };
+    return { index: s.index, total: s.questions.length, meaning: q.meaning, qid: q.qid };
   }
 
+  // The Review rule for one answered question comes from the engine
+  // (correct → clear the quiz-made flag, near miss → leave Review alone,
+  // wrong / skipped → add with that reason). Applied here because Review
+  // state lives here. Returns true if Review changed (not yet saved).
+  function applyReviewRule(entry) {
+    if (!entry.wordId) return false;
+    const rule = Engine.REVIEW_RULES[entry.result];
+    if (rule === 'add') return setAutoReviewQuiet(entry.wordId, entry.result);
+    if (rule === 'clear') return setAutoReviewQuiet(entry.wordId, false);
+    return false;
+  }
+
+  function recordAnswer(entry) {
+    if (!entry) return null;
+    if (applyReviewRule(entry)) {
+      persistReview();
+      emit('state-changed', { wordId: entry.wordId, kind: 'autoReview' });
+    }
+    return entry.result;   // 'correct' | 'near' | 'wrong' | 'skipped'
+  }
   function submitQuizAnswer(userAnswer) {
     if (!state.quiz) return null;
-    const q = state.quiz.words[state.quiz.index];
-    if (!q) return null;
-    const checked = checkAnswer(userAnswer, q.word);
-    // A near-miss ("close") still counts as wrong; it is stored as 'wrong' so
-    // the counters and the wrong-words list can never disagree.
-    const result = checked === 'close' ? 'wrong' : checked;
-    if (result === 'correct') {
-      state.quiz.correct++;
-      if (clearObsoleteAutoReview([q.wordId])) emit('state-changed', { wordId: q.wordId, kind: 'autoReview' });
-    } else if (result === 'skipped') {
-      state.quiz.skipped++;
-    } else {
-      state.quiz.wrong++;
-      setAutoReview(q.wordId, true);
-    }
-
-    state.quiz.answers.push({ wordId: q.wordId, userAnswer: userAnswer, correctWord: q.word, meaning: q.meaning, result: result });
-    // Note: no 'quiz-answer' reveal event anymore — the correct word must
-    // never be shown to the user mid-exam (only after the quiz ends), so
-    // ui.js no longer listens for this during an active question.
-    return result;
+    return recordAnswer(Engine.answerCurrent(state.quiz.session, userAnswer));
+  }
+  function skipQuizQuestion() {
+    if (!state.quiz) return null;
+    return recordAnswer(Engine.skipCurrent(state.quiz.session));
   }
 
   function nextQuizQuestion() {
     if (!state.quiz) return null;
-    state.quiz.index++;
-    if (state.quiz.index >= state.quiz.words.length) { finishQuiz(false); return null; }
+    if (!Engine.advance(state.quiz.session)) { finishQuiz(false); return null; }
     const q = currentQuizQuestion();
     emit('quiz-question', q);
     return q;
   }
 
-  function skipQuizQuestion() {
-    if (!state.quiz) return null;
-    const q = state.quiz.words[state.quiz.index];
-    if (!q) return null;
-    state.quiz.skipped++;
-    state.quiz.answers.push({ wordId: q.wordId, userAnswer: '', correctWord: q.word, meaning: q.meaning, result: 'skipped' });
-    return 'skipped';
-  }
-
   function finishQuiz(timedOut) {
-    if (!state.quiz) return;
+    if (!state.quiz) return null;
     const q = state.quiz;
     if (q.timerId) { clearInterval(q.timerId); q.timerId = null; }
-    if (timedOut) {
-      for (let i = q.index; i < q.words.length; i++) {
-        const w = q.words[i];
-        q.skipped++;
-        q.answers.push({ wordId: w.wordId, userAnswer: '', correctWord: w.word, meaning: w.meaning, result: 'skipped' });
-      }
-    }
-    // Full per-attempt record — kept (not just the aggregate counts) so a
-    // past quiz can be reopened later and show exactly which words were
-    // wrong/skipped — see the quiz-history list + quiz detail screen.
-    const record = {
-      id: 'q_' + Date.now() + '_' + Math.floor(Math.random() * 1e6),
-      ts: Date.now(), mode: q.mode, ref: q.ref, total: q.words.length,
-      correct: q.correct, wrong: q.wrong, skipped: q.skipped, timedOut: !!timedOut,
-      answers: q.answers.slice()
-    };
+
+    // Anything not answered by now (time ran out, or the quiz was ended early)
+    // counts as skipped — and skipped questions enter Review like any other.
+    const reviewChanged = Engine.expireRemaining(q.session).map(applyReviewRule).some(Boolean);
+    if (reviewChanged) { persistReview(); emit('state-changed', { kind: 'quiz-review' }); }
+
+    const record = Engine.buildRecord(q.session, { now: Date.now(), timedOut: !!timedOut });
     state.quizHistory.push(record);
-    if (state.quizHistory.length > 40) state.quizHistory = state.quizHistory.slice(-40);
+    if (state.quizHistory.length > QUIZ_HISTORY_LIMIT) state.quizHistory = state.quizHistory.slice(-QUIZ_HISTORY_LIMIT);
     writeLS(LS_KEYS.quizHistory, state.quizHistory);
 
     state.quiz = null;
@@ -976,13 +940,11 @@
     Object.keys(byType).forEach(function (t) {
       byType[t].progress = byType[t].total > 0 ? byType[t].known / byType[t].total : 0;
     });
-    const recent = state.quizHistory.slice(-10).reverse();
     return {
       byType: byType,
       vocabulary: { total: vocabTotal, known: vocabKnown, progress: vocabTotal > 0 ? vocabKnown / vocabTotal : 0 },
       overall: { total: overallTotal, known: overallKnown, progress: overallTotal > 0 ? overallKnown / overallTotal : 0 },
-      reviewWords: getReviewWords(),
-      recentQuizzes: recent
+      reviewWords: getReviewWords()
     };
   }
 
@@ -1092,7 +1054,7 @@
       if (isPlainObject(obj.known)) { state.known = obj.known; writeLS(LS_KEYS.known, state.known); applied = true; }
       if (isPlainObject(obj.manualReview)) { state.manualReview = obj.manualReview; writeLS(LS_KEYS.manualReview, state.manualReview); applied = true; }
       if (isPlainObject(obj.autoReview)) { state.autoReview = obj.autoReview; writeLS(LS_KEYS.autoReview, state.autoReview); applied = true; }
-      if (Array.isArray(obj.quizHistory)) { state.quizHistory = obj.quizHistory.slice(-40); writeLS(LS_KEYS.quizHistory, state.quizHistory); applied = true; }
+      if (Array.isArray(obj.quizHistory)) { state.quizHistory = normalizeHistory(obj.quizHistory); writeLS(LS_KEYS.quizHistory, state.quizHistory); applied = true; }
       const themeChanged = THEME_PREFS.indexOf(obj.theme) !== -1;
       const importedColor = obj.themeColor === DEFAULT_COLOR ? null : normalizeColor(obj.themeColor);
       const colorChanged = obj.themeColor === DEFAULT_COLOR || importedColor !== null;
@@ -1142,15 +1104,15 @@
     getThemeColor: getThemeColor, setThemeColor: setThemeColor, getThemeColors: function () { return THEME_COLORS.slice(); },
     getKeepAwake: getKeepAwake, setKeepAwake: setKeepAwake,
     getQuizHistory: function () { return state.quizHistory.slice(); },
+    getQuizPreview: getQuizPreview, getReviewReason: getReviewReason,
     getQuizRecord: getQuizRecord,
     exportAllData: exportAllData, importAllData: importAllData, resetAllData: resetAllData,
     isKnown: isKnown, isManualReview: isManualReview, isAutoReview: isAutoReview, needsReview: needsReview,
     toggleKnown: toggleKnown, toggleManualReview: toggleManualReview, toggleReview: toggleReview, setReview: setReview, setAutoReview: setAutoReview,
     setKnown: setKnown, setGroupKnown: setGroupKnown, getGroupTriState: getGroupTriState,
-    checkAnswer: checkAnswer, normalize: normalize, levenshtein: levenshtein,
     startFullQuiz: startFullQuiz, startSelectedQuiz: startSelectedQuiz, canStartSelectedQuiz: canStartSelectedQuiz,
     submitQuizAnswer: submitQuizAnswer, nextQuizQuestion: nextQuizQuestion, skipQuizQuestion: skipQuizQuestion,
-    finishQuiz: finishQuiz, abortQuiz: abortQuiz, getCurrentQuiz: function () { return state.quiz; },
+    finishQuiz: finishQuiz, abortQuiz: abortQuiz, getCurrentQuiz: getCurrentQuiz,
     search: search, resolveWordLocation: resolveWordLocation
   };
 })(window);

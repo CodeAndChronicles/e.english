@@ -29,17 +29,15 @@
   }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
   function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
-  function formatTime(sec) {
-    if (sec < 0) sec = 0;
-    const m = Math.floor(sec / 60), s = sec % 60;
-    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
-  }
+  // Pure formatting / labels only (no logic, no state) come from the quiz
+  // engine so a score, a percentage or a clock is written the same everywhere.
+  const QE = global.QuizEngine;
 
   const el = { screen: null, nav: null, sideNav: null, themeBtn: null };
-  const NAV_ICONS = { home: 'house', statistics: 'chart-column', settings: 'settings', info: 'info', readme: 'book-open-text' };
+  const NAV_ICONS = { home: 'house', statistics: 'chart-column', history: 'history', settings: 'settings', info: 'info', readme: 'book-open-text' };
   let route = { screen: 'home' };
   let lessonProgressRef = null; // { unit, lessonKey, fillEl, textEl } — live-updated, not rebuilt
-  let lessonQuizRef = null; // { unit, lessonKey, selectedBtn, hintEl } — Selected Quiz availability, live-updated
+  let lessonQuizRef = null; // { unit, lessonKey, selectedBtn, selectedMeta, hintEl } — Selected Quiz availability + estimate, live-updated
   let statsRefs = null; // live-updatable stats DOM refs, set by renderStatistics()
 
   // Both nav bars (bottom nav for phones, side nav for large screens) are
@@ -49,6 +47,9 @@
     [el.nav, el.sideNav].forEach(function (n) { if (n) fn(n); });
   }
   function showNav(active) {
+    // The floating theme button would sit on top of the quiz timer, and a theme
+    // switch mid-quiz is a distraction: hide it while a quiz is running.
+    document.body.classList.toggle('quiz-active', !!UX.getCurrentQuiz());
     eachNav(function (n) {
       n.hidden = false;
       n.querySelectorAll('.nav-btn').forEach(function (b) {
@@ -64,6 +65,7 @@
       b.addEventListener('click', function () {
         if (b.dataset.nav === 'home') renderHome();
         else if (b.dataset.nav === 'statistics') renderStatistics();
+        else if (b.dataset.nav === 'history') renderHistory();
         // 'settings' is implemented in JavaScript/settings.js (loaded
         // after this file) which attaches UI.renderSettings — resolved
         // dynamically here so load order between the two doesn't matter.
@@ -74,15 +76,31 @@
     });
   }
 
-  /* ---------------- Theme ---------------- */
+  /* ---------------- Theme ----------------
+     ONE source of truth: UX.getThemePreference() ('light' | 'dark' | 'system').
+     The floating button and the Settings selector both read it and both
+     write it through UX.setTheme(), so they can never disagree. */
+  const THEME_CYCLE = ['light', 'dark', 'system'];
+  const THEME_META = {
+    light: { icon: 'sun', label: 'Light' },
+    dark: { icon: 'moon', label: 'Dark' },
+    system: { icon: 'monitor', label: 'System' }
+  };
+  // The icon shows the CURRENT preference (so "System" is visibly "System");
+  // the label tells what a tap does next: Light → Dark → System → Light.
+  function syncThemeButton() {
+    if (!el.themeBtn) return;
+    const pref = UX.getThemePreference();
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(pref) + 1) % THEME_CYCLE.length];
+    clear(el.themeBtn);
+    el.themeBtn.appendChild(icon(THEME_META[pref].icon));
+    el.themeBtn.setAttribute('data-mode', pref);
+    el.themeBtn.setAttribute('title', 'Theme: ' + THEME_META[pref].label);
+    el.themeBtn.setAttribute('aria-label', 'Theme: ' + THEME_META[pref].label + '. Switch to ' + THEME_META[next].label + '.');
+  }
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
-    if (el.themeBtn) {
-      clear(el.themeBtn);
-      // Icon shows the action available (switch-to), not the current state.
-      el.themeBtn.appendChild(icon(theme === 'dark' ? 'sun' : 'moon'));
-      el.themeBtn.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-    }
+    syncThemeButton();
     syncMetaThemeColor();
   }
   // Accent palette — independent from light/dark; see CSS/root.css. The
@@ -369,21 +387,26 @@
 
         const canSelected = UX.canStartSelectedQuiz(unitNum, lessonKey);
         const row = h('div', { class: 'quiz-launch-row' });
+        const fullMeta = h('span', { class: 'quiz-launch-meta' });
+        const selectedMeta = h('span', { class: 'quiz-launch-meta' });
+        const fullBtn = h('button', {
+          class: 'btn btn-primary quiz-launch',
+          onclick: function () { if (UX.startFullQuiz(unitNum, lessonKey)) renderQuiz(); }
+        }, [icon('clipboard-list'), h('span', { class: 'quiz-launch-text' }, [h('span', { class: 'quiz-launch-title', text: 'Full Quiz' }), fullMeta])]);
         const selectedBtn = h('button', {
-          class: 'btn btn-secondary' + (canSelected ? '' : ' is-disabled'),
+          class: 'btn btn-secondary quiz-launch' + (canSelected ? '' : ' is-disabled'),
           disabled: !canSelected,
           onclick: function () { if (UX.canStartSelectedQuiz(unitNum, lessonKey) && UX.startSelectedQuiz(unitNum, lessonKey)) renderQuiz(); }
-        }, [icon('list-checks'), h('span', { text: 'Selected Quiz · 15 min' })]);
-        row.appendChild(h('button', {
-          class: 'btn btn-primary',
-          onclick: function () { if (UX.startFullQuiz(unitNum, lessonKey)) renderQuiz(); }
-        }, [icon('clipboard-list'), h('span', { text: 'Full Quiz · 30 min' })]));
+        }, [icon('list-checks'), h('span', { class: 'quiz-launch-text' }, [h('span', { class: 'quiz-launch-title', text: 'Selected Quiz' }), selectedMeta])]);
+        row.appendChild(fullBtn);
         row.appendChild(selectedBtn);
         card.appendChild(row);
         const hintEl = h('p', { class: 'hint-note', text: 'Mark some words as learned first to unlock the Selected Quiz.' });
         hintEl.hidden = canSelected;
         card.appendChild(hintEl);
-        lessonQuizRef = { unit: unitNum, lessonKey: lessonKey, selectedBtn: selectedBtn, hintEl: hintEl };
+        lessonQuizRef = { unit: unitNum, lessonKey: lessonKey, selectedBtn: selectedBtn, selectedMeta: selectedMeta, hintEl: hintEl };
+        fullMeta.textContent = quizMetaText(UX.getQuizPreview(unitNum, lessonKey, 'full'));
+        refreshQuizButtons();
       }
 
       const groupsWrap = h('div', { class: 'groups-wrap' });
@@ -595,13 +618,24 @@
     refreshQuizButtons();
   }
 
-  // The Selected Quiz needs at least one learned word — follow the state live.
+  // Shown on a launch button BEFORE the quiz starts: word count and the
+  // estimated range (see QuizEngine.estimateDuration). The range is an
+  // estimate; the timer's real limit is deliberately higher.
+  function quizMetaText(preview) {
+    if (!preview.count) return 'No words yet';
+    return 'Estimated time: ' + preview.label + ' \u00B7 ' + plural(preview.count, 'word', 'words');
+  }
+  // The Selected Quiz needs at least one learned word — follow the state
+  // live, including its word count and estimated time.
   function refreshQuizButtons() {
     if (!lessonQuizRef) return;
     const can = UX.canStartSelectedQuiz(lessonQuizRef.unit, lessonQuizRef.lessonKey);
     lessonQuizRef.selectedBtn.disabled = !can;
     lessonQuizRef.selectedBtn.classList.toggle('is-disabled', !can);
     lessonQuizRef.hintEl.hidden = can;
+    lessonQuizRef.selectedMeta.textContent = can
+      ? quizMetaText(UX.getQuizPreview(lessonQuizRef.unit, lessonQuizRef.lessonKey, 'selected'))
+      : 'Learn some words to unlock';
   }
 
   // Vocabulary-only progress bar inside the lesson's Vocabulary section
@@ -723,41 +757,49 @@
       reviewListEl: reviewListEl
     };
 
-    el.screen.appendChild(h('h2', { class: 'section-title-flat' }, [icon('history'), h('span', { text: 'Recent quizzes' })]));
-    if (!stats.recentQuizzes.length) {
-      el.screen.appendChild(h('p', { class: 'empty-note', text: 'No quizzes yet.' }));
-    } else {
-      const qList = h('div', { class: 'quiz-history-list' });
-      stats.recentQuizzes.forEach(function (q) {
-        qList.appendChild(h('button', { class: 'quiz-history-item', onclick: function () { renderQuizDetail(q.id); } }, [
-          h('span', { class: 'qh-mode', text: q.mode }),
-          h('span', { class: 'qh-stat qh-correct' }, [icon('check'), h('span', { text: String(q.correct) })]),
-          h('span', { class: 'qh-stat qh-wrong' }, [icon('x'), h('span', { text: String(q.wrong) })]),
-          h('span', { class: 'qh-stat qh-skipped' }, [icon('minus'), h('span', { text: String(q.skipped) })]),
-          icon('chevron-right', 'nav-card-chevron')
-        ]));
-      });
-      el.screen.appendChild(qList);
-    }
     showNav('statistics');
   }
 
   /* ================= Quiz ================= */
+  const RESULT_ICONS = { correct: 'check', near: 'equal-approximately', wrong: 'x', skipped: 'minus' };
+  // Feedback after each answer. It confirms how the answer was judged but
+  // never prints the correct word — the exam stays "blind" until the end.
+  const FEEDBACK = {
+    correct: { text: 'Correct' },
+    near: { text: 'Almost \u2014 counted as half a point' },
+    wrong: { text: 'Not quite' },
+    skipped: { text: 'Skipped' }
+  };
+  const FEEDBACK_DELAY_MS = { correct: 450, near: 850, wrong: 850, skipped: 450 };
+  let lastTimerState = 'normal';
+
   function renderQuiz() {
     route = { screen: 'quiz' };
     clear(el.screen);
     const quiz = UX.getCurrentQuiz();
     if (!quiz) { renderHome(); return; }
+    lastTimerState = 'normal';
 
-    el.screen.appendChild(h('header', { class: 'app-header quiz-header' }, [
+    el.screen.appendChild(h('header', { class: 'quiz-top' }, [
       h('button', {
-        class: 'icon-btn', onclick: function () {
-          if (confirm('Cancel this quiz?')) { UX.abortQuiz(); renderHome(); }
-        }
+        class: 'icon-btn quiz-close', 'aria-label': 'Cancel quiz',
+        onclick: function () { if (confirm('Cancel this quiz?')) { UX.abortQuiz(); renderHome(); } }
       }, [icon('x')]),
-      h('div', { class: 'quiz-timer', id: 'quiz-timer' }, [icon('clock'), h('span', { id: 'quiz-timer-text', text: formatTime(quiz.timeLeft) })])
+      h('div', { class: 'quiz-progress' }, [
+        h('div', { class: 'quiz-progress-text' }, [
+          h('span', { class: 'quiz-progress-now', id: 'quiz-counter-now', text: '1' }),
+          h('span', { class: 'quiz-progress-total', text: ' / ' + quiz.total })
+        ]),
+        h('div', { class: 'quiz-progress-bar' }, [h('div', { class: 'quiz-progress-fill', id: 'quiz-progress-fill' })])
+      ]),
+      h('div', { class: 'quiz-timer', id: 'quiz-timer', role: 'timer', 'aria-label': 'Time left' }, [
+        icon('timer'), h('span', { id: 'quiz-timer-text', text: QE.formatClock(quiz.timeLeft) })
+      ])
     ]));
+    el.screen.appendChild(h('div', { class: 'quiz-timebar', 'aria-hidden': 'true' }, [h('div', { class: 'quiz-timebar-fill', id: 'quiz-timebar-fill' })]));
+    el.screen.appendChild(h('div', { class: 'visually-hidden', id: 'quiz-announce', 'aria-live': 'polite' }));
     el.screen.appendChild(h('div', { class: 'quiz-body', id: 'quiz-body' }));
+    updateQuizTimer({ timeLeft: quiz.timeLeft, timeLimit: quiz.timeLimit, state: quiz.timerState });
     renderQuizQuestion();
     showNav('home');
   }
@@ -766,154 +808,320 @@
     const body = document.getElementById('quiz-body');
     if (!body) return;
     clear(body);
-    const q = UX.getCurrentQuiz();
-    if (!q) return;
-    const current = q.words[q.index];
-    if (!current) return;
+    const quiz = UX.getCurrentQuiz();
+    if (!quiz || !quiz.question) return;
 
-    body.appendChild(h('div', { class: 'quiz-counter', text: (q.index + 1) + ' / ' + q.words.length }));
-    body.appendChild(h('div', { class: 'quiz-prompt card' }, [
-      h('div', { class: 'text-muted', text: 'Type the English word' }),
-      h('div', { class: 'quiz-meaning', dir: 'auto', text: current.meaning })
+    const now = document.getElementById('quiz-counter-now');
+    const fill = document.getElementById('quiz-progress-fill');
+    if (now) now.textContent = String(quiz.index + 1);
+    if (fill) fill.style.width = Math.round((quiz.index / quiz.total) * 100) + '%';
+
+    body.appendChild(h('section', { class: 'card quiz-card quiz-enter' }, [
+      h('div', { class: 'quiz-card-label', text: 'Type the English word' }),
+      h('div', { class: 'quiz-meaning', dir: 'auto', text: quiz.question.meaning })
     ]));
 
-    const input = h('input', { type: 'text', class: 'quiz-input', placeholder: 'Your answer...', autocomplete: 'off', spellcheck: 'false' });
-    body.appendChild(input);
-    // A quiet dot — confirms the answer registered without ever printing
-    // the correct word during the exam (see doSubmit/doSkip below). The
-    // full breakdown only appears on the results screen after the quiz ends.
-    const pulse = h('div', { class: 'quiz-pulse', id: 'quiz-pulse' });
-    body.appendChild(pulse);
+    const input = h('input', {
+      type: 'text', class: 'quiz-input', dir: 'ltr', placeholder: 'Your answer',
+      autocomplete: 'off', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false',
+      enterkeyhint: 'done', 'aria-label': 'Your answer'
+    });
+    const feedback = h('div', { class: 'quiz-feedback', id: 'quiz-feedback', role: 'status', 'aria-live': 'polite' });
+    body.appendChild(h('div', { class: 'quiz-answer' }, [input, feedback]));
 
-    const actions = h('div', { class: 'quiz-actions' });
-    const submitBtn = h('button', { class: 'btn btn-primary', onclick: function () { doSubmit(input.value); } }, [h('span', { text: 'Submit' })]);
-    const skipBtn = h('button', { class: 'btn btn-secondary', onclick: doSkip }, [h('span', { text: 'Skip' })]);
-    actions.appendChild(submitBtn);
-    actions.appendChild(skipBtn);
-    body.appendChild(actions);
+    const skipBtn = h('button', { type: 'button', class: 'btn btn-secondary quiz-btn quiz-btn-skip' }, [icon('skip-forward'), h('span', { text: 'Skip' })]);
+    const submitBtn = h('button', { type: 'button', class: 'btn btn-primary quiz-btn quiz-btn-submit' }, [icon('check'), h('span', { text: 'Submit' })]);
+    // Pressing a button must not pull focus off the field — on a phone that
+    // would close and reopen the keyboard on every question.
+    [skipBtn, submitBtn].forEach(function (b) { b.addEventListener('pointerdown', function (e) { e.preventDefault(); }); });
+    body.appendChild(h('div', { class: 'quiz-actions' }, [skipBtn, submitBtn]));
 
-    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doSubmit(input.value); } });
-    setTimeout(function () { input.focus(); }, 30);
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doSubmit(); } });
+    skipBtn.addEventListener('click', doSkip);
+    submitBtn.addEventListener('click', doSubmit);
+    setTimeout(function () { if (document.body.contains(input)) input.focus(); }, 30);
 
     let locked = false;
-    function lockUI(result) {
+    function lock(result) {
       locked = true;
-      input.disabled = true;
+      input.readOnly = true; // readOnly (not disabled) keeps focus, so the keyboard stays open
       submitBtn.disabled = true;
       skipBtn.disabled = true;
       input.classList.add('answered', 'answered-' + result);
-      pulse.className = 'quiz-pulse quiz-pulse-' + result;
+      feedback.className = 'quiz-feedback quiz-feedback-' + result + ' is-shown';
+      clear(feedback);
+      feedback.appendChild(icon(RESULT_ICONS[result]));
+      feedback.appendChild(h('span', { text: FEEDBACK[result].text }));
+      setTimeout(function () {
+        const next = UX.nextQuizQuestion();
+        if (next) renderQuizQuestion();
+      }, FEEDBACK_DELAY_MS[result]);
     }
-    function doSubmit(value) {
+    function doSubmit() {
       if (locked) return;
-      const result = UX.submitQuizAnswer(value);
-      lockUI(result);
-      setTimeout(function () { const next = UX.nextQuizQuestion(); if (next) renderQuizQuestion(); }, 380);
+      const result = UX.submitQuizAnswer(input.value);
+      if (result) lock(result);
     }
     function doSkip() {
       if (locked) return;
-      UX.skipQuizQuestion();
-      lockUI('skipped');
-      setTimeout(function () { const next = UX.nextQuizQuestion(); if (next) renderQuizQuestion(); }, 320);
+      const result = UX.skipQuizQuestion();
+      if (result) lock(result);
     }
   }
 
-  function updateQuizTimer(payload) {
-    const timerText = document.getElementById('quiz-timer-text');
-    const timerWrap = document.getElementById('quiz-timer');
-    if (!timerText) return;
-    timerText.textContent = formatTime(payload.timeLeft);
-    if (timerWrap) timerWrap.classList.toggle('low-time', payload.timeLeft <= 30);
+  // Near-expiry: the clock and the thin time bar change color as the limit
+  // approaches (warning, then critical); only the critical state pulses, and
+  // only gently. The state is decided by the engine, not here.
+  function updateQuizTimer(p) {
+    const text = document.getElementById('quiz-timer-text');
+    const wrap = document.getElementById('quiz-timer');
+    const bar = document.getElementById('quiz-timebar-fill');
+    if (!text) return;
+    text.textContent = QE.formatClock(p.timeLeft);
+    if (wrap) {
+      wrap.classList.toggle('timer-warning', p.state === 'warning');
+      wrap.classList.toggle('timer-critical', p.state === 'critical');
+    }
+    if (bar) {
+      bar.style.width = Math.max(0, Math.min(100, (p.timeLeft / p.timeLimit) * 100)) + '%';
+      bar.setAttribute('data-state', p.state);
+    }
+    if (p.state !== lastTimerState) {
+      lastTimerState = p.state;
+      const say = document.getElementById('quiz-announce');
+      if (say && p.state !== 'normal') say.textContent = p.state === 'critical' ? 'Time is almost up.' : 'Time is running low.';
+    }
   }
 
-  // Shared by the just-finished quiz screen AND by reopening any past quiz
-  // from the Statistics history list — same record shape either way, so
-  // exactly what you got wrong/skipped is always one look away.
-  function renderQuizResultCard(record) {
-    const card = h('div', { class: 'card result-card' });
-    const rows = [
-      ['result-total', 'list', 'Total', record.total],
-      ['result-correct', 'circle-check', 'Correct', record.correct],
-      ['result-wrong', 'circle-x', 'Wrong', record.wrong],
-      ['result-skipped', 'skip-forward', 'Skipped', record.skipped]
-    ];
-    rows.forEach(function (r) {
-      card.appendChild(h('div', { class: 'result-row ' + r[0] }, [
-        h('span', { class: 'result-label' }, [icon(r[1]), h('span', { text: r[2] })]),
-        h('span', { class: 'result-value', text: String(r[3]) })
+  /* ---------------- Result view (shared) ----------------
+     The same view shows a quiz that just finished AND any past quiz opened
+     from Quiz History — both are the same self-contained record. */
+  function contextLabel(record) {
+    const r = record.ref || {};
+    if (r.unit == null) return 'Vocabulary quiz';
+    return 'Unit ' + r.unit + (r.lessonKey ? ' \u00B7 Lesson ' + r.lessonKey : '');
+  }
+  function modeLabel(record) { return (QE.MODES[record.mode] || QE.MODES.full).label; }
+  function dateLabel(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ' \u00B7 ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  }
+  function rangeLabel(record) {
+    return record.estimatedRange ? QE.formatRange(record.estimatedRange.min, record.estimatedRange.max) : '\u2014';
+  }
+  function pointsText(n) { return n > 0 ? '+' + QE.formatScore(n) : '0'; }
+
+  function renderQuizResultView(record) {
+    const view = h('div', { class: 'quiz-result' });
+
+    // 1) The result, at a glance.
+    const hero = h('section', { class: 'card result-hero' }, [
+      h('div', { class: 'result-hero-label', text: 'Score' }),
+      h('div', { class: 'result-score', 'aria-label': 'Score ' + QE.formatScore(record.score) + ' out of ' + QE.formatScore(record.maxScore) }, [
+        h('span', { class: 'result-score-value', text: QE.formatScore(record.score) }),
+        h('span', { class: 'result-score-max', text: ' / ' + QE.formatScore(record.maxScore) })
+      ]),
+      h('div', { class: 'result-percent' }, [
+        h('span', { class: 'result-percent-label', text: 'Percentage' }),
+        h('span', { class: 'result-percent-value', text: QE.formatPercent(record.percentage) })
+      ]),
+      h('div', { class: 'result-bar', 'aria-hidden': 'true' }, [h('div', { class: 'result-bar-fill', style: 'width:' + Math.max(0, Math.min(100, record.percentage)) + '%' })])
+    ]);
+    if (record.timedOut) hero.appendChild(h('div', { class: 'result-timedout' }, [icon('clock'), h('span', { text: 'Time ran out' })]));
+    view.appendChild(hero);
+
+    // 2) Four compact categories.
+    const cats = h('div', { class: 'result-cats' });
+    QE.CATEGORIES.forEach(function (c) {
+      cats.appendChild(h('div', { class: 'result-cat result-cat-' + c }, [
+        h('span', { class: 'result-cat-icon' }, [icon(RESULT_ICONS[c])]),
+        h('span', { class: 'result-cat-label', text: QE.LABELS[c] }),
+        h('span', { class: 'result-cat-value', text: String(record[c]) })
       ]));
     });
-    if (record.timedOut) card.appendChild(h('div', { class: 'result-timedout' }, [icon('clock'), h('span', { text: 'Time ran out' })]));
-    return card;
+    view.appendChild(cats);
+
+    // 3) Everything else lives behind one control.
+    const panel = h('div', { class: 'result-details', id: 'result-details-' + record.id });
+    panel.hidden = true;
+    let built = false;
+    const toggle = h('button', {
+      type: 'button', class: 'details-toggle', 'aria-expanded': 'false', 'aria-controls': panel.id,
+      onclick: function () {
+        const open = panel.hidden;
+        panel.hidden = !open;
+        toggle.classList.toggle('open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open && !built) { built = true; buildDetails(panel, record); }
+      }
+    }, [
+      icon('list-checks', 'details-toggle-icon'),
+      h('span', { class: 'details-toggle-label', text: 'Advanced Details' }),
+      icon('chevron-down', 'details-chevron')
+    ]);
+    view.appendChild(toggle);
+    view.appendChild(panel);
+    return view;
   }
 
-  function renderAnswerListInto(container, records, resultKind, emptyText) {
-    clear(container);
-    const filtered = (records || []).filter(function (a) { return a.result === resultKind || (resultKind === 'wrong' && a.result === 'close'); });
-    if (!filtered.length) {
-      container.appendChild(h('p', { class: 'empty-note', text: emptyText }));
+  function buildDetails(panel, record) {
+    const answered = record.correct + record.near + record.wrong; // skipped questions are not "answered"
+    const stats = [
+      ['Exact score', QE.formatScore(record.score)],
+      ['Maximum score', QE.formatScore(record.maxScore)],
+      ['Percentage', QE.formatPercent(record.percentage)],
+      ['Accuracy (answered)', answered > 0 ? QE.formatPercent((record.score / answered) * 100) : '\u2014'],
+      ['Correct', String(record.correct)],
+      ['Near Miss', String(record.near)],
+      ['Wrong', String(record.wrong)],
+      ['Skipped', String(record.skipped)],
+      ['Time spent', record.durationSeconds != null ? QE.formatClock(record.durationSeconds) : '\u2014'],
+      ['Estimated time', rangeLabel(record)],
+      ['Time limit', record.timeLimit != null ? QE.formatClock(record.timeLimit) : '\u2014']
+    ];
+    const dl = h('dl', { class: 'details-grid' });
+    stats.forEach(function (r) {
+      dl.appendChild(h('div', { class: 'details-item' }, [h('dt', { text: r[0] }), h('dd', { text: r[1] })]));
+    });
+    panel.appendChild(dl);
+
+    panel.appendChild(h('h3', { class: 'details-subtitle', text: 'Question breakdown' }));
+    if (!record.answers.length) {
+      panel.appendChild(h('p', { class: 'empty-note', text: 'Question details were not saved for this quiz.' }));
       return;
     }
-    filtered.forEach(function (a) {
-      const rowChildren = [
-        h('div', { class: 'result-text' }, [
-          h('span', { class: 'result-word', text: a.correctWord }),
-          h('span', { class: 'result-meaning', dir: 'auto', text: a.meaning || '' })
-        ])
-      ];
-      if (resultKind === 'wrong' && a.userAnswer) {
-        rowChildren.push(h('span', { class: 'answer-you-wrote', text: a.userAnswer }));
-      }
-      container.appendChild(h('div', { class: 'result-row answer-review-row' }, rowChildren));
+    const filters = h('div', { class: 'details-filters', role: 'group', 'aria-label': 'Filter questions' });
+    const list = h('div', { class: 'qd-list' });
+    let active = 'all';
+    const defs = [{ key: 'all', label: 'All', n: record.answers.length }].concat(QE.CATEGORIES.map(function (c) {
+      return { key: c, label: QE.LABELS[c], n: record[c] };
+    }));
+    function drawList() {
+      clear(list);
+      const rows = record.answers.filter(function (a) { return active === 'all' || a.result === active; });
+      if (!rows.length) { list.appendChild(h('p', { class: 'empty-note', text: 'Nothing here.' })); return; }
+      rows.forEach(function (a) {
+        const main = [
+          h('span', { class: 'qd-expected', text: a.expected }),
+          h('span', { class: 'qd-prompt', dir: 'auto', text: a.prompt })
+        ];
+        if (a.userAnswer && a.result !== 'correct') main.push(h('span', { class: 'qd-yours' }, [h('span', { class: 'text-muted', text: 'You wrote: ' }), a.userAnswer]));
+        list.appendChild(h('div', { class: 'qd-row qd-' + a.result }, [
+          h('span', { class: 'qd-badge', title: QE.LABELS[a.result], 'aria-label': QE.LABELS[a.result] }, [icon(RESULT_ICONS[a.result])]),
+          h('div', { class: 'qd-main' }, main),
+          h('span', { class: 'qd-points', text: pointsText(a.score) })
+        ]));
+      });
+    }
+    defs.forEach(function (d) {
+      const b = h('button', {
+        type: 'button', class: 'details-filter' + (d.key === active ? ' active' : ''),
+        'aria-pressed': d.key === active ? 'true' : 'false',
+        onclick: function () {
+          active = d.key;
+          filters.querySelectorAll('.details-filter').forEach(function (x) {
+            const on = x.dataset.key === active;
+            x.classList.toggle('active', on); x.setAttribute('aria-pressed', on ? 'true' : 'false');
+          });
+          drawList();
+        }
+      }, [h('span', { text: d.label }), h('span', { class: 'details-filter-count', text: String(d.n) })]);
+      b.dataset.key = d.key;
+      if (d.key !== 'all' && d.n === 0) b.classList.add('is-empty');
+      filters.appendChild(b);
     });
-  }
-
-  function renderQuizBreakdown(container, record) {
-    clear(container);
-    container.appendChild(h('h2', { class: 'section-title-flat breakdown-wrong' }, [icon('circle-x'), h('span', { text: 'Wrong words (' + record.wrong + ')' })]));
-    const wrongList = h('div', { class: 'review-list' });
-    renderAnswerListInto(wrongList, record.answers, 'wrong', 'No wrong answers — well done!');
-    container.appendChild(wrongList);
-
-    container.appendChild(h('h2', { class: 'section-title-flat breakdown-skipped' }, [icon('skip-forward'), h('span', { text: 'Skipped words (' + record.skipped + ')' })]));
-    const skippedList = h('div', { class: 'review-list' });
-    renderAnswerListInto(skippedList, record.answers, 'skipped', 'You did not skip any words.');
-    container.appendChild(skippedList);
+    panel.appendChild(filters);
+    panel.appendChild(list);
+    drawList();
   }
 
   function renderQuizFinished(record) {
     route = { screen: 'quiz-result' };
     clear(el.screen);
-    el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Quiz results' })]));
-    el.screen.appendChild(renderQuizResultCard(record));
-    const breakdown = h('div', { class: 'quiz-breakdown' });
-    renderQuizBreakdown(breakdown, record);
-    el.screen.appendChild(breakdown);
-    el.screen.appendChild(h('button', { class: 'btn btn-primary', onclick: renderHome }, [h('span', { text: 'Back to home' })]));
+    el.screen.appendChild(h('header', { class: 'app-header' }, [
+      h('div', {}, [
+        h('h1', { class: 'title-lg', text: 'Quiz results' }),
+        h('p', { class: 'text-muted', text: modeLabel(record) + ' \u00B7 ' + contextLabel(record) })
+      ])
+    ]));
+    el.screen.appendChild(renderQuizResultView(record));
+    el.screen.appendChild(h('div', { class: 'result-actions' }, [
+      h('button', { class: 'btn btn-primary', onclick: renderHome }, [icon('house'), h('span', { text: 'Back to home' })]),
+      h('button', { class: 'btn btn-secondary', onclick: renderHistory }, [icon('history'), h('span', { text: 'Quiz History' })])
+    ]));
     showNav('home');
   }
 
-  /* ================= Quiz detail (reopening a past quiz from history) ================= */
-  function renderQuizDetail(recordId) {
-    const record = UX.getQuizRecord(recordId);
-    if (!record) { renderStatistics(); return; }
-    route = { screen: 'quiz-detail' };
-    clear(el.screen);
-    const d = new Date(record.ts);
-    const dateStr = d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  /* ================= Quiz History (its own tab) ================= */
+  function renderHistoryItem(rec) {
+    const counts = h('div', { class: 'qh-counts' });
+    QE.CATEGORIES.forEach(function (c) {
+      counts.appendChild(h('span', { class: 'qh-count qh-count-' + c, title: QE.LABELS[c] + ': ' + rec[c], 'aria-label': QE.LABELS[c] + ' ' + rec[c] }, [icon(RESULT_ICONS[c]), h('span', { text: String(rec[c]) })]));
+    });
+    return h('button', {
+      type: 'button', class: 'qh-item',
+      'aria-label': modeLabel(rec) + ', ' + contextLabel(rec) + ', score ' + QE.formatScore(rec.score) + ' of ' + QE.formatScore(rec.maxScore),
+      onclick: function () { renderQuizDetail(rec.id); }
+    }, [
+      h('div', { class: 'qh-top' }, [
+        h('div', { class: 'qh-title' }, [
+          h('span', { class: 'qh-mode', text: modeLabel(rec) }),
+          h('span', { class: 'qh-context', text: contextLabel(rec) })
+        ]),
+        h('div', { class: 'qh-score' }, [
+          h('span', { class: 'qh-score-value', text: QE.formatScore(rec.score) }),
+          h('span', { class: 'qh-score-max', text: ' / ' + QE.formatScore(rec.maxScore) })
+        ])
+      ]),
+      h('div', { class: 'qh-meta' }, [
+        h('span', { class: 'qh-pct', text: QE.formatPercent(rec.percentage) }),
+        h('span', { class: 'qh-dot', text: '\u00B7', 'aria-hidden': 'true' }),
+        h('span', { class: 'qh-duration' }, [icon('timer'), h('span', { text: rec.durationSeconds != null ? QE.formatClock(rec.durationSeconds) : '\u2014' })]),
+        h('span', { class: 'qh-date', text: dateLabel(rec.ts) })
+      ]),
+      counts,
+      icon('chevron-right', 'qh-chevron')
+    ]);
+  }
 
+  function renderHistory() {
+    route = { screen: 'history' };
+    clear(el.screen);
     el.screen.appendChild(h('header', { class: 'app-header' }, [
-      h('button', { class: 'icon-btn back-btn', 'aria-label': 'Back', onclick: renderStatistics }, [icon('arrow-left')]),
       h('div', {}, [
-        h('h1', { class: 'title-lg', text: record.mode === 'selected' ? 'Selected Quiz' : 'Full Quiz' }),
-        h('p', { class: 'text-muted', text: dateStr })
+        h('h1', { class: 'title-lg', text: 'Quiz History' }),
+        h('p', { class: 'text-muted', text: 'Your last 40 quizzes, newest first' })
       ])
     ]));
-    el.screen.appendChild(renderQuizResultCard(record));
-    const breakdown = h('div', { class: 'quiz-breakdown' });
-    renderQuizBreakdown(breakdown, record);
-    el.screen.appendChild(breakdown);
-    showNav('statistics');
+    const records = UX.getQuizHistory().reverse();
+    if (!records.length) {
+      el.screen.appendChild(h('div', { class: 'card history-empty' }, [
+        icon('history', 'history-empty-icon'),
+        h('p', { class: 'empty-note', text: 'No quizzes yet. Finish a quiz and it will appear here.' })
+      ]));
+    } else {
+      const list = h('div', { class: 'quiz-history-list' });
+      records.forEach(function (rec) { list.appendChild(renderHistoryItem(rec)); });
+      el.screen.appendChild(list);
+    }
+    showNav('history');
+  }
+
+  // Reopening a past quiz — same view as right after finishing it.
+  function renderQuizDetail(recordId) {
+    const record = UX.getQuizRecord(recordId);
+    if (!record) { renderHistory(); return; }
+    route = { screen: 'quiz-detail' };
+    clear(el.screen);
+    el.screen.appendChild(h('header', { class: 'app-header' }, [
+      h('button', { class: 'icon-btn back-btn', 'aria-label': 'Back to Quiz History', onclick: renderHistory }, [icon('arrow-left')]),
+      h('div', {}, [
+        h('h1', { class: 'title-lg', text: modeLabel(record) }),
+        h('p', { class: 'text-muted', text: contextLabel(record) + ' \u00B7 ' + dateLabel(record.ts) })
+      ])
+    ]));
+    el.screen.appendChild(renderQuizResultView(record));
+    showNav('history');
   }
 
   /* ================= Info =================
@@ -975,9 +1183,11 @@
     applyThemeColor(UX.getThemeColor());
     if (el.themeBtn) {
       el.themeBtn.addEventListener('click', function () {
-        UX.setTheme(UX.getTheme() === 'dark' ? 'light' : 'dark');
+        const pref = UX.getThemePreference();
+        UX.setTheme(THEME_CYCLE[(THEME_CYCLE.indexOf(pref) + 1) % THEME_CYCLE.length]);
       });
     }
+    UX.on('theme-preference-changed', syncThemeButton);
     UX.on('theme-changed', applyTheme);
     UX.on('theme-color-changed', applyThemeColor);
 
@@ -996,6 +1206,7 @@
     function rerenderCurrent() {
       if (route.screen === 'lesson') renderLesson(route.unit, route.lessonKey);
       else if (route.screen === 'statistics') renderStatistics();
+      else if (route.screen === 'history') renderHistory();
       else if (route.screen === 'unit') renderUnit(route.unit);
     }
     UX.on('data-imported', rerenderCurrent);
@@ -1018,6 +1229,8 @@
     renderUnit: renderUnit,
     renderLesson: renderLesson,
     renderStatistics: renderStatistics,
+    renderHistory: renderHistory,
+    renderQuizDetail: renderQuizDetail,
     renderQuiz: renderQuiz,
     navigateToWord: navigateToWord,
     showNav: showNav,
