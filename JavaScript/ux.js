@@ -872,12 +872,12 @@
   const SEARCH_DEBOUNCE_MS = 300;
   const runSearch = debounce(function (query) {
     state.lastSearchQuery = query;
-    const q = normalize(query);
+    const q = Engine.normalizeAnswer(query);
     if (!q) { emit('search-results', { query: query, results: [] }); return; }
     const exact = [], starts = [], includes = [];
     for (let i = 0; i < state.searchIndex.length; i++) {
       const item = state.searchIndex[i];
-      const w = normalize(item.word), m = normalize(item.meaning);
+      const w = Engine.normalizeAnswer(item.word), m = Engine.normalizeAnswer(item.meaning);
       if (w === q || m === q) exact.push(item);
       else if (w.indexOf(q) === 0 || m.indexOf(q) === 0) starts.push(item);
       else if (w.indexOf(q) !== -1 || m.indexOf(q) !== -1) includes.push(item);
