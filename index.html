@@ -32,7 +32,7 @@
 </head>
 <body>
   <div id="app">
-    <button id="theme-toggle-btn" class="theme-toggle-btn" aria-label="Toggle light / dark mode">
+    <button id="theme-toggle-btn" class="theme-toggle-btn" aria-label="Theme">
     </button>
     <nav id="side-nav" class="side-nav" hidden>
       <img src="Ui/Logo.png" alt="" class="side-nav-logo" />
@@ -41,6 +41,9 @@
       </button>
       <button class="nav-btn" data-nav="statistics">
         <span>Statistics</span>
+      </button>
+      <button class="nav-btn" data-nav="history">
+        <span>Quiz History</span>
       </button>
       <button class="nav-btn" data-nav="settings">
         <span>Settings</span>
@@ -60,6 +63,9 @@
       <button class="nav-btn" data-nav="statistics">
         <span>Statistics</span>
       </button>
+      <button class="nav-btn" data-nav="history" aria-label="Quiz History">
+        <span>History</span>
+      </button>
       <button class="nav-btn" data-nav="settings">
         <span>Settings</span>
       </button>
@@ -74,6 +80,7 @@
 
   <script src="JavaScript/version.js"></script>
   <script src="JavaScript/icons.js"></script>
+  <script src="JavaScript/quiz-engine.js"></script>
   <script src="JavaScript/ux.js"></script>
   <script src="JavaScript/ui.js"></script>
   <script src="JavaScript/settings.js"></script>

@@ -18,7 +18,7 @@ const CACHE_PREFIX = self.EE_CACHE_PREFIX;   // "e-english-"
 const SHELL = [
   './', 'index.html', 'app.json', 'README.md', 'manifest.webmanifest',
   'CSS/root.css', 'CSS/responsive.css', 'CSS/animations.css', 'CSS/settings.css',
-  'JavaScript/version.js', 'JavaScript/icons.js', 'JavaScript/ux.js', 'JavaScript/ui.js', 'JavaScript/settings.js', 'JavaScript/readme.js',
+  'JavaScript/version.js', 'JavaScript/icons.js', 'JavaScript/quiz-engine.js', 'JavaScript/ux.js', 'JavaScript/ui.js', 'JavaScript/settings.js', 'JavaScript/readme.js',
   'Ui/Logo.png', 'Ui/Font.ttf'
 ];
 

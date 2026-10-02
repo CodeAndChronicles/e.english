@@ -13,6 +13,7 @@
 - [Content types](#content-types)
 - [Part of speech system](#part-of-speech-system)
 - [Quiz system](#quiz-system)
+- [Quiz History](#quiz-history)
 - [Review system](#review-system)
 - [Progress and statistics](#progress-and-statistics)
 - [Offline-first behavior](#offline-first-behavior)
@@ -47,11 +48,12 @@ E English is built for learners who want a calm, focused way to practise vocabul
 - **Four content types** in every lesson: Vocabulary, Synonyms & Antonyms, Idioms & Phrasal Verbs, and Derivatives.
 - **Word cards** that show the word, its part of speech, its difficulty, its meaning and any extra fields.
 - **Learned checkboxes** for each word and for each group of words.
-- **Two quiz modes** with a timer and a full results breakdown.
-- **A Review list** that collects the words you flagged and the words you got wrong.
-- **Statistics** for each content type and for all content together.
+- **Two quiz modes** with an estimated time, a smart time limit, near-miss scoring and a compact result screen.
+- **A Review list** that collects the words you flagged, the words you got wrong and the words you skipped.
+- **Statistics** for learning progress in each content type and overall.
+- **Quiz History**: a tab of its own with every past quiz and its details.
 - **Search** across every word and meaning.
-- **Light, Dark and System themes** and a choice of eight accent palettes.
+- **Light, Dark and System themes** (also switchable from the floating button) and a choice of eight accent palettes.
 - **Offline support** through a service worker.
 - **Import and export** of your progress as a JSON file.
 
@@ -100,43 +102,77 @@ If a word can work in two ways, it has two tags separated by a slash, such as `n
 
 Quizzes are opened from the **Vocabulary** section of a lesson. They always cover that one lesson only.
 
-| Mode | Words used | Time limit |
-| --- | --- | --- |
-| **Full Quiz** | Every vocabulary word in the lesson. | 30 minutes |
-| **Selected Quiz** | Only the words you marked as learned. | 15 minutes |
+| Mode | Words used |
+| --- | --- |
+| **Full Quiz** | Every vocabulary word in the lesson. |
+| **Selected Quiz** | Only the words you marked as learned. |
 
 The Selected Quiz button unlocks as soon as at least one word is marked as learned, and it locks again if you unmark them all.
+
+**Dynamic duration.** There are no fixed 15 or 30 minute limits any more. Before you start, each button shows an **estimated time**, for example `Estimated time: 12–16 min`, and the number of words. Three different numbers are involved:
+
+| Number | What it is |
+| --- | --- |
+| **Estimated duration** | What a typical attempt should take. |
+| **Estimated range** | The fast-to-careful range shown on the button. |
+| **Time limit** | What the timer actually allows. It is set well above the estimate so the quiz never feels rushed. |
+
+The estimate is built question by question from reading time (longer meanings take longer), recall time and the number of letters you must type, plus a small allowance for tapping through to the next question. A slight slowdown is added for long quizzes. The time limit is roughly 1.75 times the estimate plus a one-minute buffer, and it always stays above the slow end of the range. The Quiz Engine calculates all of this, so a quiz of 80 words gets a time limit that fits 80 words, not a number borrowed from a 20-word quiz.
 
 **How a question works**
 
 1. You see the meaning of a word.
 2. You type the English word and press **Submit**, or press **Skip**.
-3. The correct word is not shown during the quiz. The full breakdown appears at the end.
+3. A short message tells you how the answer was judged. The correct word is not shown during the quiz.
+4. The next question appears. The top of the screen shows your progress and the time left.
 
-**How answers are checked**
+**The timer.** The clock counts real time. As the limit approaches, the clock and a thin time bar turn amber, then red for the last moments. Only the red state pulses, and only gently. When time runs out, the questions you did not answer are counted as skipped.
 
-- Capital letters, extra spaces and end punctuation are ignored.
-- An exact match is **correct**.
-- A near miss, such as a small typing mistake, is marked **wrong**.
-- An empty answer or a skipped question is **skipped**.
-- When the time runs out, the questions you did not answer are counted as skipped.
+**Scoring**
+
+| Result | Meaning | Points |
+| --- | --- | --- |
+| **Correct** | The answer matches the word after cleaning it up. | **1** |
+| **Near Miss** | You clearly meant the right word but made a small typing mistake. | **0.5** |
+| **Wrong** | Anything else. | **0** |
+| **Skipped** | You skipped the question or left it empty. | **0** |
+
+Before comparing, the answer is trimmed, written in lowercase, has repeated spaces merged, and loses harmless punctuation at the end. Near misses are found with an edit-distance check (Levenshtein), not by guessing:
+
+- Words shorter than 5 letters must be exact. One wrong letter in `cat` makes it a different word.
+- Words of 5 to 8 letters allow one typing mistake. Swapping two neighbouring letters counts as one mistake.
+- Words of 9 letters or more allow up to two mistakes.
+- The answer must also stay at least 75% similar to the word, and shorter words must keep their first letter.
+
+For example, `enviroment` for `environment` is a near miss and scores 0.5, while `banana` for `apple` is wrong. The limits are named constants at the top of `JavaScript/quiz-engine.js`, so they can be tuned without touching the algorithm.
 
 **Question order.** Words that are in your review list are chosen more often, about seven out of every ten questions while they last. Every word appears exactly once.
 
-**Results.** After each quiz you see the totals, the list of wrong words and the list of skipped words. The last 40 quizzes are kept, and you can reopen any of them from the Statistics page.
+**Result screen.** When the quiz ends you see a compact summary:
+
+- **Score**, for example `52.5 / 70`. Half points are never rounded away.
+- **Percentage**, calculated from the real maximum score.
+- Four small boxes: **Correct**, **Near Miss**, **Wrong** and **Skipped**.
+
+Everything else is hidden behind **Advanced Details**. Open it to see the exact and maximum score, percentage, accuracy (skipped questions excluded), all four counts, time spent, estimated time, time limit and a question-by-question breakdown with filters. Each row shows the word, its meaning, what you wrote and the points earned.
+
+**Quiz Engine architecture.** All quiz logic lives in `JavaScript/quiz-engine.js`: question selection, modes, duration estimate, timer maths, answer checking, scoring and result records. It has no access to the page, to storage or to the event bus, and it loads before everything else. `JavaScript/ux.js` connects it to the app: it keeps the quiz state, runs the timer, applies the Review rules, saves history and announces changes. `JavaScript/ui.js` only draws the screens.
 
 ## Review system
 
 A word is **in review** when either of these is true:
 
 - you flagged it yourself with the **Review** button on its card, or
-- you answered it wrongly in a quiz.
+- you **answered it wrongly** or **skipped it** in a quiz.
 
-Both cases lead to the **same** word, in the same Unit and Lesson. There is only one review state per word, so the word card, the Review list on the Statistics page and the quiz always agree.
+A **Near Miss never enters Review**, and neither does a correct answer. Quiz-made entries remember why the word is there (`wrong` or `skipped`).
+
+Both ways lead to the **same** word, in the same Unit and Lesson. There is only one review state per word, so the word card, the Review list on the Statistics page and the quiz always agree.
 
 - Press **Review** on a card to add the word. Press **In review** to remove it. Removing it clears every review record for that word.
-- Marking a word as **learned** clears a review flag that came from a quiz. A flag you set by hand stays until you remove it.
-- Answering a word correctly in a later quiz also clears its quiz-made flag.
+- Marking a word as **learned** clears a review entry that came from a quiz. A flag you set by hand stays until you remove it.
+- Answering a word correctly in a later quiz also clears its quiz-made entry.
+- Your own manual flags are never replaced by a quiz result.
 - A word can never appear twice in the list.
 - Tap a word in the Review list to jump straight to its card in the lesson.
 
@@ -144,7 +180,7 @@ All of this updates immediately. You never need to refresh the page.
 
 ## Progress and statistics
 
-The **Statistics** page shows, each with a progress bar:
+The **Statistics** page is only about **learning progress**. It shows, each with a progress bar:
 
 - Vocabulary
 - Synonyms & Antonyms
@@ -152,7 +188,17 @@ The **Statistics** page shows, each with a progress bar:
 - Derivatives
 - Overall, which combines all four
 
-Below the bars you will find the **Words to review** list and your **Recent quizzes**. Every number updates live when you change a checkbox, a review flag or finish a quiz.
+Below the bars you will find the **Words to review** list. Every number updates live when you change a checkbox, a review flag or finish a quiz.
+
+Past quizzes are **not** shown here. They have their own tab, described next.
+
+## Quiz History
+
+The **Quiz History** tab lists your last 40 quizzes, newest first. Each item shows the quiz mode, the lesson, the score (for example `52.5 / 70`), the percentage, the time spent, the number of correct, near-miss, wrong and skipped answers, and the date and time.
+
+Tap an item to open the same result view you saw after the quiz, including **Advanced Details**.
+
+Every history item is a **snapshot**. For each question it stores the word, its meaning, the expected answer, what you typed, the result and the points. Because of that, an old result stays exactly as it was even if the lesson files change later. Older history saved by earlier versions is upgraded automatically when the app starts.
 
 ## Offline-first behavior
 
@@ -160,6 +206,7 @@ The first time you open the site online, a service worker saves the app files an
 
 - the app opens and works with no connection,
 - lessons load from the cache and are refreshed quietly in the background when you are online,
+- the Quiz Engine and the rest of the app code are cached too, so quizzes work with no connection,
 - this README is cached too.
 
 Each release of the app has a **model version** (see `JavaScript/version.js`). When the version changes, the old cached app files are replaced with new ones. Only the cache is replaced. Your learning data is never touched by a version change.
@@ -172,8 +219,8 @@ Your progress is stored in your browser's `localStorage` under these keys:
 | --- | --- |
 | `eenglish.known` | The words you marked as learned. |
 | `eenglish.manualReview` | Words you flagged for review. |
-| `eenglish.autoReview` | Words added to review by a wrong quiz answer. |
-| `eenglish.quizHistory` | Your last 40 quiz results. |
+| `eenglish.autoReview` | Words added to review by a quiz: wrong or skipped, with the reason. |
+| `eenglish.quizHistory` | Your last 40 quiz results, each with a snapshot of every question. |
 | `eenglish.theme` | Light, Dark or System. |
 | `eenglish.themeColor` | Your accent palette, if you chose one. |
 | `eenglish.keepAwake` | The keep-screen-awake setting. |
@@ -181,7 +228,7 @@ Your progress is stored in your browser's `localStorage` under these keys:
 
 Every word has a stable ID built from its Unit, Lesson, section and text, never from its position in a file. You can reorder a lesson file and your progress stays with the right words.
 
-**Keeping storage honest.** Each time the lessons load completely, the app compares your saved data with the current lessons. Progress that belongs to words that no longer exist is removed, and quiz records are trimmed so their totals match the words that can really be shown. Progress for words that still exist is never changed. If any lesson file fails to load, nothing is removed.
+**Keeping storage honest.** Each time the lessons load completely, the app compares your saved word state (learned and review) with the current lessons. Entries that belong to words that no longer exist are removed, and a word can never be in both review lists. Progress for words that still exist is never changed. Quiz history is not trimmed this way, because each record carries its own snapshot. If any lesson file fails to load, nothing is removed.
 
 ## Theme and customization
 
@@ -192,6 +239,8 @@ Open **Settings** to change the look of the app.
 - **Light**
 - **Dark**
 - **System**: follows your device and changes live when your device switches between light and dark.
+
+The **floating theme button** in the corner uses the same setting. Each tap moves to the next mode: Light, then Dark, then System, then Light again. Its icon always shows the mode you are in (sun, moon or monitor), and the Settings selector follows it instantly. The button is hidden while a quiz is running.
 
 **Accent color**
 
@@ -240,7 +289,7 @@ Use them to back up your progress or move it to another device. After an import,
 
 E English runs in current versions of Chrome, Edge, Safari and Firefox, on phones, tablets and computers. The layout adapts to the screen:
 
-- **Phones**: one column and a navigation bar at the bottom.
+- **Phones**: one column and a navigation bar at the bottom (Home, Statistics, History, Settings, Info, README).
 - **Tablets**: wider cards, with the word cards of an open group arranged in columns.
 - **Desktops**: a slim side navigation, and the groups of a section shown side by side.
 
@@ -266,7 +315,8 @@ CSS/
 JavaScript/
   version.js            The single source of the model version
   icons.js              Built-in icon set
-  ux.js                 State, storage, quiz logic, event bus
+  quiz-engine.js        Quiz logic: duration, scoring, answer checking
+  ux.js                 State, storage, event bus, quiz and review glue
   ui.js                 Screens and rendering
   settings.js           Settings screen
   readme.js             README screen and Markdown renderer
@@ -277,7 +327,7 @@ Ui/
   Logo.png, Font.ttf    Brand assets
 ```
 
-The code is split on purpose. `ux.js` owns all data and logic and has no access to the page. `ui.js`, `settings.js` and `readme.js` only draw screens and talk to `ux.js`. When something changes, `ux.js` announces it on a small event bus, and every open screen updates itself.
+The code is split on purpose. `quiz-engine.js` holds pure quiz logic and touches nothing else. `ux.js` owns the app state and storage and has no access to the page. `ui.js`, `settings.js` and `readme.js` only draw screens and talk to `ux.js`. When something changes, `ux.js` announces it on a small event bus, and every open screen updates itself.
 
 ## How content is organized
 
@@ -311,8 +361,8 @@ The complete rules are in `Files/CONTENT-FORMAT.md`.
 
 - Progress belongs to one browser on one device. There is no sync, so use Export and Import to move it.
 - Private browsing windows and cleared site data do not keep progress.
-- A quiz is not saved mid-way. If you leave a quiz, its answers are discarded.
-- Quizzes cover one lesson pair at a time, and only its Vocabulary section.
+- A quiz is not saved mid-way. If you leave a quiz, its answers are discarded and nothing is added to Review or History.
+- Quizzes cover one lesson pair at a time, and only its Vocabulary section. The estimated time is a guide: how fast you really type will vary.
 - Renaming a word, or moving it to another Unit, Lesson or section, makes it a new word. Its old progress is then removed.
 - The first visit needs an internet connection so the lessons can be cached for offline use.
 
