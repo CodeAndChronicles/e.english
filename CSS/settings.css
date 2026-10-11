@@ -62,6 +62,12 @@
 .settings-row-flush { border-bottom: none; padding-bottom: var(--sp-sm); min-height: 0; }
 .settings-seg-wrap { padding-bottom: var(--sp-md); border-bottom: 1px solid var(--color-border); }
 .segmented-full { display: flex; width: 100%; max-width: 440px; padding: 4px; }
+/* Font style buttons preview their own weight. */
+.segmented-font .segmented-btn[data-value="regular"] { font-weight: 400; }
+.segmented-font .segmented-btn[data-value="bold"], .segmented-font .segmented-btn[data-value="o2"] { font-weight: 700; }
+.font-help { list-style: none; margin: var(--sp-sm) 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--font-size-sm); color: var(--color-text-muted); line-height: 1.5; }
+.font-help strong { color: var(--color-text); font-weight: var(--fw-head); }
+.font-help-tag { margin-inline-start: 6px; padding: 0 7px; border-radius: var(--r-pill); background: var(--color-mint); color: var(--color-ink); font-size: var(--font-size-xs); }
 .segmented-full .segmented-btn { flex: 1; min-width: 0; padding: var(--sp-xs) var(--sp-xs); white-space: nowrap; }
 
 /* ---- Accent color picker: Default + two groups of four ---- */
@@ -89,8 +95,8 @@
 .swatch-lavender { background: #A995DC; }
 .swatch-rose { background: #E39AB6; }
 .swatch-sand { background: #D9B679; }
-/* Default = the multi-color look: a conic dot of the base hues. */
-.swatch-default { background: conic-gradient(#2B62C4 0 25%, #B4491A 0 50%, #7047B5 0 75%, #12758B 0 100%); }
+/* Default = the calm azure primary. */
+.swatch-default { background: #2C6BA8; }
 .swatch-label { font-size: var(--font-size-sm); }
 
 /* ---- Toggle switch (keep screen awake) ---- */

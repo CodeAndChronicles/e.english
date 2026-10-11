@@ -10,10 +10,13 @@ html, body {
   margin: 0; padding: 0;
   font-family: var(--font-main);
   font-size: var(--font-size-md);
+  font-weight: var(--fw-body); /* normal text; headings use --fw-head (see root.css font system) */
   color: var(--color-text);
   background: var(--color-bg);
   direction: ltr;
 }
+/* Headings follow the heading role; form controls follow the body role. */
+h1, h2, h3, h4, h5, h6 { font-weight: var(--fw-head); }
 /* Layout-stability guards: reserve the scrollbar gutter (no horizontal
    jump when a screen becomes scrollable), never scroll sideways, and let
    long words/URLs wrap instead of stretching a card. */
@@ -21,7 +24,7 @@ html { scrollbar-gutter: stable; overflow-x: hidden; -webkit-text-size-adjust: 1
 body { overflow-x: hidden; overflow-wrap: break-word; }
 img, svg { max-width: 100%; }
 #screen-container > * { min-width: 0; }
-button, input { font-family: inherit; font-size: inherit; color: inherit; }
+button, input { font-family: inherit; font-size: inherit; font-weight: inherit; color: inherit; }
 button { cursor: pointer; border: none; background: none; text-align: inherit; }
 button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
@@ -51,7 +54,8 @@ button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
 .title-lg { font-size: var(--font-size-xl); font-weight: var(--fw-bold); margin: 0; line-height: 1.3; }
 .text-muted { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .empty-note { color: var(--color-text-muted); font-size: var(--font-size-sm); text-align: center; padding: var(--sp-lg) 0; }
-.hint-note { color: var(--color-review); font-size: var(--font-size-xs); margin: 0 0 var(--sp-sm); }
+/* A note, shown as a subtle highlighted callout instead of colored small print. */
+.hint-note { --hl: var(--hlt-yellow); color: var(--color-text); background: color-mix(in srgb, var(--hl) var(--hlt-alpha), transparent); box-shadow: inset 3px 0 0 color-mix(in srgb, var(--hl) 70%, transparent); font-size: var(--font-size-sm); line-height: 1.5; margin: 0 0 var(--sp-sm); padding: var(--sp-xs) var(--sp-sm); border-radius: var(--r-md); }
 
 /* ---------- App header ---------- */
 .app-header {
@@ -117,6 +121,11 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
   color: var(--tone, var(--color-ink));
   background: var(--tone-bg, var(--color-mint));
   border-radius: var(--r-md);
+  /* Explicit box: the svg is border-box, so 22px of glyph + 12px padding per side
+     must be spelled out — otherwise the padding eats the whole 1em and the
+     glyph is invisible (only an empty tinted square showed). */
+  box-sizing: border-box;
+  width: calc(22px + var(--sp-sm) * 2); height: calc(22px + var(--sp-sm) * 2);
   padding: var(--sp-sm);
   font-size: 22px;
   flex-shrink: 0;
@@ -125,6 +134,10 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .nav-card-title { font-size: var(--font-size-lg); font-weight: var(--fw-bold); }
 .nav-card-sub { font-size: var(--font-size-sm); color: var(--color-text-muted); }
 .nav-card-chevron { color: var(--color-text-muted); flex-shrink: 0; }
+/* Home unit card: the unit's progress sits under its name (one bar per UNIT). */
+.unit-progress { display: flex; align-items: center; gap: var(--sp-sm); margin-top: var(--sp-xs); }
+.unit-progress .progress-bar { flex: 1; min-width: 0; }
+.unit-progress-pct { flex-shrink: 0; min-width: 3.4ch; text-align: end; font-size: var(--font-size-sm); font-weight: var(--fw-head); font-variant-numeric: tabular-nums; color: var(--color-text); }
 
 /* ---------- Section cards (Vocabulary / Idioms / Synonyms & Antonyms) ---------- */
 .sections-wrap { display: flex; flex-direction: column; gap: var(--sp-lg); margin-bottom: var(--sp-lg); }
@@ -145,9 +158,9 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
    all resolve to that accent (see the --tone-* tokens in root.css). */
 .tone-blue, .sec-vocabulary { --tone: var(--tone-blue); --tone-bg: var(--tone-blue-bg); }
 .tone-cyan, .sec-synonyms { --tone: var(--tone-cyan); --tone-bg: var(--tone-cyan-bg); }
-.tone-amber, .sec-idioms { --tone: var(--tone-amber); --tone-bg: var(--tone-amber-bg); }
-.tone-violet, .sec-derivatives { --tone: var(--tone-violet); --tone-bg: var(--tone-violet-bg); }
-.tone-rose { --tone: var(--tone-rose); --tone-bg: var(--tone-rose-bg); }
+.tone-amber { --tone: var(--tone-amber); --tone-bg: var(--tone-amber-bg); }
+.tone-violet, .sec-idioms { --tone: var(--tone-violet); --tone-bg: var(--tone-violet-bg); }
+.tone-rose, .sec-derivatives { --tone: var(--tone-rose); --tone-bg: var(--tone-rose-bg); }
 .tone-slate, .sec-generic { --tone: var(--tone-slate); --tone-bg: var(--tone-slate-bg); }
 .section-head-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .section-title { font-size: var(--font-size-lg); font-weight: var(--fw-bold); margin: 0; }
@@ -361,73 +374,146 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .quiz-launch-title { font-weight: var(--fw-bold); line-height: 1.2; }
 .quiz-launch-meta { font-family: var(--font-en); font-size: 12px; font-weight: var(--fw-regular); opacity: 0.85; line-height: 1.3; }
 
-/* ---------- Quiz (mobile-first; every control is >= 48px tall) ---------- */
-.quiz-top { display: flex; align-items: center; gap: var(--sp-sm); margin-bottom: var(--sp-xs); }
-.quiz-close { flex-shrink: 0; }
-.quiz-progress { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.quiz-progress-text { font-variant-numeric: tabular-nums; line-height: 1; }
-.quiz-progress-now { font-size: var(--font-size-lg); font-weight: var(--fw-bold); }
-.quiz-progress-total { color: var(--color-text-muted); font-size: var(--font-size-sm); }
-.quiz-progress-bar { height: 6px; border-radius: var(--r-pill); background: var(--color-surface-alt); overflow: hidden; }
-.quiz-progress-fill { height: 100%; width: 0; border-radius: var(--r-pill); background: var(--color-ink); transition: width var(--t-med) var(--ease-out); }
+/* ---------- Quiz: a fullscreen session ----------
+   While a quiz runs the site chrome is gone (body.quiz-active hides the bottom
+   bar, the side rail and the theme button) and .quiz-fs fills the screen.
+   Mobile first: header, a strip of numbered buttons, the question, and the
+   Previous / Next buttons at the bottom (the thumb zone). From 1024px a compact
+   panel listing the questions appears on the right and the strip disappears. */
+/* No page scrollbar behind the quiz: it would make the fixed layer 15px narrower on desktop. */
+html:has(body.quiz-active), body.quiz-active { overflow: hidden !important; }
+html:has(body.quiz-active) { scrollbar-gutter: auto; }   /* html normally reserves a gutter; the quiz layer must use the full width */
+body.quiz-active #bottom-nav, body.quiz-active #side-nav { display: none !important; }
+@media (min-width: 1024px) { body.quiz-active #app { padding-inline-start: 0; } }
+.quiz-fs {
+  position: fixed; inset: 0; z-index: 400;
+  display: flex; flex-direction: column;
+  height: 100vh; height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--color-bg); color: var(--color-text);
+  animation: none;
+}
+.quiz-bar { display: flex; align-items: center; gap: var(--sp-sm); padding: var(--sp-sm) var(--sp-md); flex-shrink: 0; }
+.quiz-close, .quiz-review-btn { flex-shrink: 0; }
+.quiz-heading { flex: 1; min-width: 0; line-height: 1.25; }
+.quiz-title { font-size: var(--font-size-md); font-weight: var(--fw-head); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quiz-sub { font-size: var(--font-size-xs); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
 .quiz-timer {
   display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
   padding: 6px 12px; border-radius: var(--r-pill);
   background: var(--color-surface-alt); color: var(--color-text);
-  font-weight: var(--fw-bold); font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-head); font-variant-numeric: tabular-nums;
   transition: background var(--t-med) var(--ease-out), color var(--t-med) var(--ease-out);
 }
 .quiz-timer .icon { width: 18px; height: 18px; }
 .quiz-timer.timer-warning { background: var(--color-review-bg); color: var(--color-review); }
 .quiz-timer.timer-critical { background: var(--color-danger-bg); color: var(--color-danger); }
-/* Thin remaining-time bar under the header. */
-.quiz-timebar { height: 4px; border-radius: var(--r-pill); background: var(--color-surface-alt); overflow: hidden; margin-bottom: var(--sp-md); }
-.quiz-timebar-fill { height: 100%; width: 100%; border-radius: var(--r-pill); background: var(--color-ink); transition: width 1s linear, background var(--t-med) var(--ease-out); }
+.quiz-timebar { height: 3px; background: var(--color-surface-alt); flex-shrink: 0; }
+.quiz-timebar-fill { height: 100%; width: 100%; background: var(--tone-blue); transition: width 1s linear, background var(--t-med) var(--ease-out); }
 .quiz-timebar-fill[data-state="warning"] { background: var(--color-review); }
 .quiz-timebar-fill[data-state="critical"] { background: var(--color-danger); }
 
-.quiz-body { display: flex; flex-direction: column; gap: var(--sp-md); }
-.quiz-card { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: var(--sp-xs); min-height: 150px; padding: var(--sp-lg) var(--sp-md); }
-.quiz-card-label { font-size: var(--font-size-xs); font-weight: var(--fw-medium); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
-.quiz-meaning { font-size: var(--font-size-xl); font-weight: var(--fw-bold); line-height: 1.35; overflow-wrap: anywhere; }
+/* Question numbers (mobile). Each state differs in color AND shape AND marker:
+     answered   = filled green + check      (it only says "something was typed")
+     unanswered = empty gray outline
+     skipped    = dashed outline + dash
+   the current question has a thick ring. */
+.quiz-numbers {
+  display: flex; gap: var(--sp-xs); overflow-x: auto; flex-shrink: 0;
+  padding: var(--sp-xs) var(--sp-md) var(--sp-sm);
+  scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+}
+.quiz-numbers::-webkit-scrollbar { display: none; }
+.qn {
+  position: relative; flex: 0 0 auto; width: 44px; height: 44px; scroll-snap-align: center;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 12px; border: 2px solid var(--color-disabled);
+  background: transparent; color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums; font-weight: var(--fw-head);
+}
+.qn-num { font-size: var(--font-size-md); }
+.qn-marker { position: absolute; top: -5px; inset-inline-end: -5px; display: none; width: 18px; height: 18px; border-radius: 50%; align-items: center; justify-content: center; }
+.qn-marker .icon { width: 12px; height: 12px; stroke-width: 3; }
+.qn-answered { background: var(--color-success); border-color: var(--color-success); color: var(--color-bg); }
+.qn-answered .qn-marker { display: inline-flex; background: var(--color-text); color: var(--color-bg); }
+.qn-skipped { border-style: dashed; border-color: var(--color-text-muted); color: var(--color-text); }
+.qn-skipped .qn-marker { display: inline-flex; background: var(--color-text-muted); color: var(--color-bg); }
+.qn-current { box-shadow: 0 0 0 3px var(--color-bg), 0 0 0 5px var(--color-ink); }
+.qn:focus-visible, .qp-row:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
 
+.quiz-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.quiz-main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.quiz-stage-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.quiz-stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-md); padding: var(--sp-sm) var(--sp-md) var(--sp-md); width: 100%; max-width: 720px; margin-inline: auto; overflow-y: auto; }
+.quiz-card { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: var(--sp-xs); min-height: 150px; padding: var(--sp-lg) var(--sp-md); }
+.quiz-card-label { font-size: var(--font-size-xs); font-weight: var(--fw-head); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.quiz-meaning { font-size: clamp(24px, 6.5vw, 32px); font-weight: var(--fw-head); line-height: 1.35; overflow-wrap: anywhere; }
 .quiz-answer { display: flex; flex-direction: column; gap: var(--sp-xs); }
 .quiz-input {
   width: 100%; min-height: 60px; padding: var(--sp-sm) var(--sp-md);
-  border: 2px solid var(--color-border);
-  border-radius: var(--r-md);
+  border: 2px solid var(--color-border); border-radius: var(--r-md);
   font-size: 22px; /* >= 16px so iOS never zooms the page on focus */
-  text-align: center;
-  outline: none;
+  text-align: center; outline: none;
   background: var(--color-surface); color: var(--color-text);
-  transition: border-color var(--t-fast) var(--ease-out), background var(--t-med) var(--ease-out);
+  transition: border-color var(--t-fast) var(--ease-out);
 }
-.quiz-input:focus { border-color: var(--color-ink); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-ink) 14%, transparent); }
-/* Per-answer feedback never prints the correct word, so the exam stays
-   "blind" until the results. Three distinct, non-green-only states:
-   exact = green + check, near miss = amber + approx sign, wrong = red + x,
-   skipped = neutral + dash. Icon AND text are shown, never color alone. */
-.quiz-input.answered { pointer-events: none; }
-.quiz-input.answered-correct { border-color: var(--color-success); background: var(--color-success-bg); }
-.quiz-input.answered-near { border-color: var(--color-review); background: var(--color-review-bg); border-style: dashed; }
-.quiz-input.answered-wrong { border-color: var(--color-danger); background: var(--color-danger-bg); }
-.quiz-input.answered-skipped { border-color: var(--color-disabled); background: var(--color-surface-alt); }
-.quiz-feedback {
-  min-height: 28px; display: flex; align-items: center; justify-content: center; gap: 6px;
-  font-weight: var(--fw-bold); font-size: var(--font-size-sm);
-  opacity: 0; transform: translateY(-2px);
-  transition: opacity var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+.quiz-input:focus { border-color: var(--color-ink); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-ink) 16%, transparent); }
+/* What the quiz tells you about the CURRENT question: only whether you have
+   written something — never whether it is right. Icon + words + color. */
+.quiz-state-line { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 24px; font-size: var(--font-size-sm); color: var(--color-text-muted); }
+.quiz-state-line .icon { width: 16px; height: 16px; }
+.quiz-state-answered { color: var(--color-success); }
+
+.quiz-foot, .qs-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-sm); margin-top: auto; padding-top: var(--sp-sm); }
+.quiz-nav-btn { min-height: 56px; width: 100%; font-size: var(--font-size-md); }
+.quiz-nav-btn:disabled { opacity: 0.45; }
+
+/* The "ready to finish?" step */
+.quiz-summary { justify-content: flex-start; }
+.qs-heading { margin: var(--sp-sm) 0 0; font-size: var(--font-size-xl); }
+.qs-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-xs); }
+.qs-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--sp-sm) var(--sp-xs); border-radius: var(--r-md); border: 2px solid var(--color-border); background: var(--color-surface); text-align: center; }
+.qs-icon .icon { width: 20px; height: 20px; }
+.qs-label { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.qs-value { font-size: var(--font-size-xl); font-weight: var(--fw-head); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.qs-answered { border-color: var(--color-success); }
+.qs-answered .qs-icon { color: var(--color-success); }
+.qs-skipped { border-style: dashed; border-color: var(--color-text-muted); }
+.qs-chips { display: flex; flex-wrap: wrap; gap: var(--sp-xs); }
+
+/* Desktop word panel — hidden on phones (the number strip does its job there). */
+.quiz-panel { display: none; }
+@media (min-width: 1024px) {
+  .quiz-numbers { display: none; }
+  .quiz-bar { padding-inline: var(--sp-xl); }
+  .quiz-body { flex-direction: row; }
+  .quiz-main { flex: 1 1 auto; min-width: 0; }
+  /* On a big screen the question, the answer box and the buttons sit together in the middle, not pinned to the edges. */
+  .quiz-stage { flex: 0 1 auto; margin-block: auto; justify-content: flex-start; padding-inline: var(--sp-xl); }
+  .quiz-foot { margin-top: var(--sp-sm); }
+  .quiz-summary { margin-block: 0; padding-top: var(--sp-xl); }
+  .quiz-panel {
+    display: flex; flex-direction: column; flex: 0 0 248px; min-height: 0;
+    margin: var(--sp-sm) var(--sp-lg) var(--sp-lg) 0; padding: var(--sp-sm);
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--r-lg);
+  }
+  .qp-title { margin: 0; padding: var(--sp-xs) var(--sp-xs) var(--sp-sm); font-size: var(--font-size-sm); color: var(--color-text-muted); font-weight: var(--fw-head); text-transform: uppercase; letter-spacing: 0.06em; }
+  .qp-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .qp-row {
+    display: flex; align-items: center; gap: var(--sp-xs); width: 100%; min-height: 40px; padding: 4px var(--sp-xs);
+    border-radius: var(--r-sm); border: 2px solid transparent; text-align: start; font-size: var(--font-size-sm);
+  }
+  .qp-row:hover { background: var(--color-surface-alt); }
+  .qp-num { flex: 0 0 auto; min-width: 2ch; font-variant-numeric: tabular-nums; font-weight: var(--fw-head); color: var(--color-text-muted); }
+  .qp-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qp-marker { flex: 0 0 auto; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid var(--color-disabled); }
+  .qp-marker .icon { width: 12px; height: 12px; stroke-width: 3; }
+  .qp-row-answered .qp-marker { background: var(--color-success); border-color: var(--color-success); color: var(--color-bg); }
+  .qp-row-skipped .qp-marker { border-style: dashed; border-color: var(--color-text-muted); color: var(--color-text-muted); }
+  .qp-row-current { border-color: var(--color-ink); background: var(--color-mint); }
+  .qp-row-current .qp-num { color: var(--color-ink); }
 }
-.quiz-feedback.is-shown { opacity: 1; transform: none; }
-.quiz-feedback-correct { color: var(--color-success); }
-.quiz-feedback-near { color: var(--color-review); }
-.quiz-feedback-wrong { color: var(--color-danger); }
-.quiz-feedback-skipped { color: var(--color-text-muted); }
-
-.quiz-actions { display: grid; grid-template-columns: 1fr 1.6fr; gap: var(--sp-sm); }
-.quiz-btn { min-height: 52px; width: 100%; font-size: var(--font-size-md); }
-.quiz-btn:disabled { opacity: 0.55; }
-
+@media (max-height: 560px) { .quiz-card { min-height: 100px; padding: var(--sp-sm); } .quiz-meaning { font-size: 22px; } }
 
 /* ---------- Quiz result (shared by "just finished" and Quiz History detail) ---------- */
 .quiz-result { display: flex; flex-direction: column; gap: var(--sp-md); }
@@ -440,7 +526,7 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .result-percent-label { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .result-percent-value { font-size: var(--font-size-xl); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
 .result-bar { width: 100%; max-width: 360px; height: 8px; border-radius: var(--r-pill); background: var(--color-surface-alt); overflow: hidden; margin-top: var(--sp-xs); }
-.result-bar-fill { height: 100%; border-radius: var(--r-pill); background: var(--color-ink); }
+.result-bar-fill { height: 100%; border-radius: var(--r-pill); background: var(--tone-blue); }
 .result-timedout { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--color-review); margin-top: var(--sp-xs); font-weight: var(--fw-bold); font-size: var(--font-size-sm); }
 
 .result-cats { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-xs); }
@@ -505,8 +591,23 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .qd-points { flex-shrink: 0; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; color: var(--cat-fg); font-size: var(--font-size-sm); padding-top: 4px; }
 
 /* ---------- Statistics ---------- */
-.stats-cards-grid { display: flex; flex-direction: column; gap: var(--sp-md); margin-bottom: var(--sp-lg); }
-.stats-card { margin-bottom: 0; }
+/* ---------- Statistics: overall hero + one grouped list ---------- */
+.stats-hero { display: flex; flex-direction: column; gap: var(--sp-xs); padding: var(--sp-lg); margin-bottom: var(--sp-sm); }
+.stats-hero-label { font-size: var(--font-size-xs); font-weight: var(--fw-head); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.stats-hero-main { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-sm); flex-wrap: wrap; }
+.stats-hero-pct { font-size: clamp(40px, 13vw, 56px); line-height: 1; font-weight: var(--fw-head); font-variant-numeric: tabular-nums; }
+.stats-hero-count { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+.stats-section-title { display: flex; align-items: center; gap: var(--sp-xs); margin: var(--sp-lg) 0 var(--sp-sm); padding-inline: var(--sp-2xs); font-size: var(--font-size-lg); font-weight: var(--fw-head); line-height: 1.3; }
+.stats-section-title .icon { width: 20px; height: 20px; color: var(--color-review); }
+.stats-types { padding: var(--sp-2xs) var(--sp-lg); margin-bottom: var(--sp-xs); }
+.stats-type { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: var(--sp-sm); row-gap: var(--sp-2xs); padding: var(--sp-md) 0; border-bottom: 1px solid var(--color-border); }
+.stats-type:last-child { border-bottom: none; }
+.stats-type-badge { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--r-md); background: var(--tone-bg, var(--color-mint)); color: var(--tone, var(--color-ink)); }
+.stats-type-text { display: flex; flex-direction: column; min-width: 0; }
+.stats-type-label { font-weight: var(--fw-head); line-height: 1.3; }
+.stats-type-count { color: var(--color-text-muted); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
+.stats-type-pct { font-weight: var(--fw-head); font-size: var(--font-size-lg); font-variant-numeric: tabular-nums; }
+.stats-type-bar { grid-column: 1 / -1; margin: var(--sp-2xs) 0 0; height: 8px; }
 
 /* ---------- Info ---------- */
 /* ---------- Info ---------- */
@@ -529,10 +630,14 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .info-footer { font-family: var(--font-en); margin-top: auto; padding: var(--sp-xl) 0 var(--sp-xs); text-align: center; color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--fw-regular); }
 .info-footer p { margin: 0; }
 .info-copyright { margin-top: 2px; opacity: 0.85; }
-.stats-row { display: flex; justify-content: space-between; padding: var(--sp-xs) 0; gap: var(--sp-sm); }
-.stats-value { font-weight: var(--fw-bold); flex-shrink: 0; }
+/* ONE progress look for the whole app (Home, Statistics, Lesson, Quiz): track =
+   --color-surface-alt, fill = the current tone. By default each content type
+   keeps its own tone; with an accent selected every tone becomes that accent
+   (root.css), so no bar has a fixed color of its own. */
 .progress-bar { width: 100%; height: 10px; background: var(--color-surface-alt); border-radius: var(--r-pill); overflow: hidden; margin: var(--sp-sm) 0; }
-.progress-fill { height: 100%; background: var(--tone, var(--color-ink)); border-radius: var(--r-pill); }
+.progress-fill { height: 100%; background: var(--tone, var(--color-ink)); border-radius: var(--r-pill); transition: width var(--t-med) var(--ease-out); }
+.progress-sm { height: 8px; margin: 0; }
+.progress-lg { height: 12px; margin: var(--sp-xs) 0 0; }
 .review-list, .quiz-history-list { display: flex; flex-direction: column; gap: var(--sp-xs); margin-bottom: var(--sp-lg); }
 /* ---------- Quiz History (its own tab) ---------- */
 .qh-item {
@@ -671,8 +776,8 @@ body.quiz-active .theme-toggle-btn { display: none; }
   /* keep the bottom-nav clearance — the shorthand alone would drop it */
   #screen-container { padding: var(--sp-lg); padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--sp-lg)); }
   .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-md); }
-  .stats-cards-grid { display: grid; grid-template-columns: 1fr 1fr; }
-  .stats-card-overall { grid-column: 1 / -1; }
+  .stats-types { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--sp-xl); }
+  .stats-type:nth-last-child(2):nth-child(odd) { border-bottom: none; }
 }
 @media (min-width: 1024px) {
   :root { --content-max-width: 1000px; }
@@ -742,3 +847,116 @@ body.quiz-active .theme-toggle-btn { display: none; }
 .md-table tr:last-child td { border-bottom: none; }
 .md-hr { border: none; border-top: 1px solid var(--color-border); margin: var(--sp-lg) 0; }
 .md-img { max-width: 100%; height: auto; border-radius: var(--r-md); }
+
+/* ---------- Info: study method ----------
+   The owner's text is Egyptian Arabic, shown right-to-left inside the LTR
+   page. Readable first: generous line height, short paragraphs. The eye is
+   then caught by a few highlights — a soft tinted rounded background with a
+   light glow; the text itself keeps the normal text color, so contrast stays
+   high in Light and Dark. Meanings: blue = easy / normal, red = needs focus,
+   ink = the "black pen". */
+.study-card { margin-bottom: var(--sp-md); }
+.study-text { line-height: 2.05; font-size: var(--font-size-md); text-align: start; overflow-wrap: anywhere; max-width: 46rem; margin-inline: auto; } /* comfortable line length on wide screens */
+.study-p { margin: 0 0 var(--sp-md); }
+.study-lead { margin: 0 0 var(--sp-lg); font-size: var(--font-size-lg); font-weight: var(--fw-head); line-height: 1.7; }
+/* Transition lines (the "what if you forget?" / "how do we review?" questions): a clear visual pause. */
+.study-transition {
+  margin: var(--sp-xl) 0 var(--sp-md); padding: var(--sp-sm) var(--sp-md);
+  border-inline-start: 4px solid var(--color-ink); border-radius: var(--r-md);
+  background: var(--color-mint); font-weight: var(--fw-head); font-size: var(--font-size-lg); line-height: 1.6;
+}
+/* Example sentences: small inline-style blocks, not cards. */
+.study-example {
+  display: block; width: fit-content; max-width: 100%;
+  margin: var(--sp-2xs) 0 var(--sp-sm); padding: 2px var(--sp-md);
+  border: 1px dashed var(--color-mint-strong); border-radius: var(--r-md);
+  background: var(--color-surface-alt); font-weight: var(--fw-head);
+}
+.study-example-en { font-family: var(--font-en); text-align: left; }
+.study-aside { margin: 0 0 var(--sp-md); font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
+/* ---------- Highlight system (shared by the whole site) ----------
+   A highlight is a soft tinted rounded rectangle behind normal-colored text,
+   like a real highlighter on paper: low intensity, no glow, no blur, and the
+   text keeps its own color so reading is never harder. Use it sparingly —
+   for a key phrase, a note, a tip, a warning, an important state. Never on
+   whole paragraphs. The four colors are decoration for the eye; none of them
+   stands for a meaning (that is why they are separate from the theme colors). */
+.hl {
+  --hl: var(--hlt-yellow);
+  display: inline; padding: 0.02em 0.5em; margin-inline: 0.1em;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--hl) var(--hlt-alpha), transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hl) 38%, transparent);
+  color: var(--color-text);
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
+.hl-yellow { --hl: var(--hlt-yellow); }
+.hl-green { --hl: var(--hlt-green); }
+.hl-purple { --hl: var(--hlt-purple); }
+.hl-pink { --hl: var(--hlt-pink); }
+/* The two halves of a split word (indivi · duals): a little bigger, each its own chip. */
+.hl-syl { padding: 0.06em 0.65em; font-family: var(--font-en); font-weight: var(--fw-head); unicode-bidi: isolate; }
+/* A pen color named in the text: colored ink, no background (pens ≠ highlighters). */
+.pen { font-weight: var(--fw-head); }
+.pen-blue { color: var(--pen-blue); }
+.pen-red { color: var(--pen-red); }
+.pen-black { color: var(--color-text); }
+
+/* Block version: a note / tip / warning. Soft rounded background, a thin start edge, plain text. */
+.callout {
+  --hl: var(--hlt-yellow);
+  padding: var(--sp-sm) var(--sp-md);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--hl) var(--hlt-alpha), transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--hl) 70%, transparent);
+  color: var(--color-text);
+}
+.callout-ok { --hl: var(--hlt-green); }
+.callout-text { margin: 0; line-height: 1.55; font-size: var(--font-size-sm); }
+.callout .qs-chips { margin-top: var(--sp-sm); }
+
+/* Legend inside the Study Method card: small rounded rectangles, like swatches of real highlighters. */
+.hl-legend { margin-top: var(--sp-lg); padding-top: var(--sp-md); border-top: 1px solid var(--color-border); }
+.hl-legend-title { margin: 0 0 var(--sp-xs); font-size: var(--font-size-sm); font-weight: var(--fw-head); color: var(--color-text-muted); }
+.hl-legend-list { list-style: none; margin: 0 0 var(--sp-sm); padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-xs); }
+.hl-swatch { display: inline-block; margin: 0; padding: 0.15em 0.9em; font-family: var(--font-en); font-size: var(--font-size-sm); }
+.hl-note {
+  margin: 0; padding: var(--sp-sm) var(--sp-md); line-height: 1.9; font-size: var(--font-size-sm);
+  border-radius: var(--r-md); background: var(--color-surface-alt); text-align: start;
+}
+
+/* ---------- Synonyms & Antonyms: study cards ----------
+   Bigger cards for studying, not a data table: the word is the first thing you
+   see, its meaning sits right under it, then the Synonyms and the Antonyms each
+   as their own titled group of large chips. One card per row at every width,
+   so nothing is squeezed horizontally. */
+.word-card-study { padding: var(--sp-md) var(--sp-lg) var(--sp-lg); gap: var(--sp-sm); }
+.word-card-study .word-text { font-size: clamp(28px, 7vw, 34px); line-height: 1.15; }
+.word-card-study .word-meaning { font-size: var(--font-size-lg); line-height: 1.55; color: var(--color-text); }
+.related { display: flex; flex-direction: column; gap: var(--sp-md); margin-top: var(--sp-xs); padding-top: var(--sp-md); border-top: 1px solid var(--color-border); }
+.related-group { display: flex; flex-direction: column; gap: var(--sp-xs); min-width: 0; }
+.related-title { display: flex; align-items: center; gap: 6px; margin: 0; font-size: var(--font-size-sm); font-weight: var(--fw-head); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.related-icon { width: 16px; height: 16px; }
+.related-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-xs); }
+.related-chip {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 6px var(--sp-md);
+  border-radius: var(--r-md); border: 2px solid var(--tone-line, var(--color-border));
+  background: var(--tone-fill, var(--color-surface-alt)); color: var(--color-text);
+  font-family: var(--font-en); font-size: var(--font-size-lg); font-weight: var(--fw-head); direction: ltr; overflow-wrap: anywhere;
+}
+.related-syn { --tone-fill: var(--tone-cyan-bg); --tone-line: color-mix(in srgb, var(--tone-cyan) 55%, transparent); }
+.related-syn .related-title { color: var(--tone-cyan); }
+/* Antonyms: a different tone AND a dashed outline, so the two groups differ without color. */
+.related-ant { --tone-fill: var(--tone-rose-bg); --tone-line: color-mix(in srgb, var(--tone-rose) 55%, transparent); }
+.related-ant .related-chip { border-style: dashed; }
+.related-ant .related-title { color: var(--tone-rose); }
+/* These cards never join the compact multi-column word grid: one card per row. */
+.group-body:has(.word-card-study) { display: none; }
+.group.open .group-body:has(.word-card-study) { display: flex; flex-direction: column; gap: var(--sp-sm); padding: var(--sp-sm); }
+.group .group-body .word-card-study { margin: 0; padding: var(--sp-md) var(--sp-lg) var(--sp-lg); gap: var(--sp-sm); }
+.group .group-body .word-card-study .word-text { font-size: clamp(28px, 7vw, 34px); }
+.group .group-body .word-card-study .word-meaning { font-size: var(--font-size-lg); line-height: 1.55; }
+.group .group-body .word-card-study .word-card-head { display: flex; }
+.group .group-body .word-card-study .flag-label { display: inline; }
+.group .group-body .word-card-study .flag-btn { min-width: 44px; min-height: 44px; padding: 0 var(--sp-sm); }

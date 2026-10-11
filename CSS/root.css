@@ -3,34 +3,65 @@
    Colour model (two layers):
      1. BASE / SEMANTIC tokens (this file, top): neutral Carbon-style greys,
         success / review / danger, per-section "tone" hues and one color per
-        part of speech. In the DEFAULT state nothing is forced to a single
-        accent — the app is intentionally multi-color.
+        part of speech. The DEFAULT look is calm and cool: one clear primary
+        (a soft azure) for actions, active states and progress, neutral cool
+        greys for everything else, and secondary hues used ONLY where they tell
+        things apart (the four content types, parts of speech).
      2. ACCENT palettes (bottom): 8 muted, Carbon-inspired palettes chosen in
         Settings. Picking one sets <html data-color="…">, which re-points the
         accent tokens AND every "tone" token at that palette, so the whole
         UI adopts one unified accent. Success / review / danger and part-of-
         speech colors are NOT touched — they keep their meaning. */
 
+/* ---- Font system ----
+   One family, two real faces (the files are in Ui/):
+     400 → Regular.ttf     700 → Bold.ttf
+   Which weight each kind of text gets is decided by TWO roles, set by the
+   Settings "Font style" choice (<html data-font="o2|regular|bold">):
+     --fw-body  normal text      --fw-head  headings, titles, key values
+   o2 (default): body 400 / head 700 · regular: both 400 · bold: both 700.
+   Every rule in the CSS uses --fw-regular / --fw-medium / --fw-bold, which
+   all point at those two roles, so the whole app follows the mode with no
+   per-screen font code.
+   Note: Regular.ttf contains Arabic and digits but NO Latin letters, so
+   English letters in Regular text come from the system font (the next one
+   in --font-main); Bold.ttf has both. */
 @font-face {
-  font-family: 'EEnglishFont';
-  src: url('../Ui/Font.ttf') format('truetype');
+  font-family: 'EEnglish';
+  src: url('../Ui/Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: 'EEnglish';
+  src: url('../Ui/Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Font style modes (see the font system note above). */
+:root[data-font="regular"] { --fw-body: 400; --fw-head: 400; }
+:root[data-font="bold"] { --fw-body: 700; --fw-head: 700; }
 
 /* Shared tokens that don't change between themes. */
 :root {
   /* ---- Typography ---- */
-  --font-main: 'EEnglishFont', system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-en: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-fallback: system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-main: 'EEnglish', var(--font-fallback);
+  --font-en: var(--font-main); /* English content uses the same family, so the Font style applies to it too */
   --font-size-xs: 12px;
   --font-size-sm: 13.5px;
   --font-size-md: 15.5px;
   --font-size-lg: 18px;
   --font-size-xl: 24px;
   --font-size-xxl: 30px;
-  --fw-regular: 400;
-  --fw-medium: 600;
-  --fw-bold: 700;
+  --fw-body: 400;
+  --fw-head: 700;
+  --fw-regular: var(--fw-body);
+  --fw-medium: var(--fw-head);
+  --fw-bold: var(--fw-head);
 
   /* ---- Spacing ---- */
   --sp-2xs: 4px;
@@ -49,7 +80,7 @@
   /* ---- Layout ---- */
   --nav-height: 64px;
   --content-max-width: 720px;
-  --side-nav-width: 160px;
+  --side-nav-width: 148px;
 
   /* ---- Motion ---- */
   --t-fast: 0.14s;
@@ -65,45 +96,47 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  /* Neutrals (Carbon-style cool greys) */
-  --color-bg: #F4F4F4;
+  /* Neutrals: cool greys, tuned for long reading (text 15:1, muted text 5.4:1) */
+  --color-bg: #F5F6F8;
   --color-surface: #FFFFFF;
-  --color-surface-alt: #EDEDED;
-  --color-border: #E0E0E0;
-  --color-text: #161616;
-  --color-text-muted: #6F6F6F;
-  --color-disabled: #B8B8B8;
+  --color-surface-alt: #ECEFF3;
+  --color-border: #DDE2E8;
+  --color-text: #1A1F26;
+  --color-text-muted: #5B6674;
+  --color-disabled: #AEB6C1;
 
-  /* Default accent = neutral ink (no color forced) */
-  --color-primary: #262626;
-  --color-primary-hover: #3D3D3D;
+  /* Default primary: a calm azure. White on it = 5.6:1; as text on white = 5.6:1. */
+  --color-primary: #2C6BA8;
+  --color-primary-hover: #235A91;
   --color-primary-contrast: #FFFFFF;
-  --color-ink: #262626;
-  --color-mint: #ECEEF1;
-  --color-mint-strong: #DDE1E6;
+  --color-ink: #2C6BA8;
+  --color-mint: #E8F0F9;
+  --color-mint-strong: #D1E2F3;
 
   /* Semantic states (never re-pointed by an accent) */
-  --color-success: #198038;
-  --color-success-bg: #DEFBE6;
-  --color-review: #8F6200;
-  --color-review-bg: #FCF1D9;
-  --color-danger: #C1272D;
-  --color-danger-bg: #FBE7E8;
+  --color-success: #1D7A3B;
+  --color-success-bg: #E1F5E8;
+  --color-review: #8A5A00;
+  --color-review-bg: #FBF0D6;
+  --color-danger: #BE2530;
+  --color-danger-bg: #FBE6E7;
 
   /* Known-word card tint: semantic green by default, accent tint when an accent is picked */
   --color-known-bg: var(--color-success-bg);
-  --color-known-border: #B7E6C4;
+  --color-known-border: #BFE6CD;
   /* "Learned" checkbox / accent bar: semantic green by default, the accent when one is picked */
-  --color-known-fill: #198038;
+  --color-known-fill: #1D7A3B;
   --color-known-contrast: #FFFFFF;
 
-  /* Section / icon "tones": distinct hues by default, unified under an accent */
-  --tone-blue: #2B62C4;   --tone-blue-bg: #E6EEFB;
-  --tone-cyan: #12758B;   --tone-cyan-bg: #E0F2F6;
-  --tone-amber: #8F6200;  --tone-amber-bg: #FBEED7;
-  --tone-violet: #7047B5; --tone-violet-bg: #EEE7F8;
-  --tone-rose: #B3336B;   --tone-rose-bg: #FBE6EE;
-  --tone-slate: #4A5563;  --tone-slate-bg: #E9ECF0;
+  /* Content-type "tones": the primary plus three quiet secondaries. They are used
+     only to tell the four content types apart (and for matching icons); under an
+     accent every tone becomes that accent. Amber is NOT a tone: it means "review". */
+  --tone-blue: #2C6BA8;   --tone-blue-bg: #E8F0F9;     /* Vocabulary  (= the primary) */
+  --tone-cyan: #1D7773;   --tone-cyan-bg: #DFF1F0;     /* Synonyms & Antonyms (teal) */
+  --tone-violet: #6A4FA3; --tone-violet-bg: #ECE8F6;   /* Idioms & Phrasal Verbs */
+  --tone-rose: #8B4A7D;   --tone-rose-bg: #F6E8F2;     /* Derivatives (plum) */
+  --tone-amber: #8A5A00;  --tone-amber-bg: #FBF0D6;
+  --tone-slate: #4F5B69;  --tone-slate-bg: #E9EDF1;
 
   /* Part of speech: one color each */
   --pos-noun-fg: #1F5FBF;  --pos-noun-bg: #E5EDFB;
@@ -115,6 +148,16 @@
   --pos-conj-fg: #856400;  --pos-conj-bg: #FBF2CF;
   --pos-other-fg: #5A6470; --pos-other-bg: #ECEEF1;
 
+  /* Study highlighter chips + pen inks. These are NOT the theme: a highlighter
+     color is only a way to catch the eye, it never stands for a meaning. */
+  --hlt-yellow: #F5C518;
+  --hlt-green: #3DAE6A;
+  --hlt-purple: #8E6BD8;
+  --hlt-pink: #E0629F;
+  --hlt-alpha: 30%;
+  --pen-blue: #2B62C4;
+  --pen-red: #C1272D;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.09);
 }
@@ -122,39 +165,39 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-bg: #161616;
-  --color-surface: #262626;
-  --color-surface-alt: #303030;
-  --color-border: #393939;
-  --color-text: #F4F4F4;
-  --color-text-muted: #A8A8A8;
-  --color-disabled: #565656;
+  --color-bg: #13171C;
+  --color-surface: #1D2229;
+  --color-surface-alt: #272D35;
+  --color-border: #333A44;
+  --color-text: #EDF0F4;
+  --color-text-muted: #A2ACB8;
+  --color-disabled: #565F6B;
 
-  --color-primary: #E8E8E8;
-  --color-primary-hover: #FFFFFF;
-  --color-primary-contrast: #161616;
-  --color-ink: #E8E8E8;
-  --color-mint: #2E3238;
-  --color-mint-strong: #3A3F46;
+  --color-primary: #7DB3EA;
+  --color-primary-hover: #98C4F0;
+  --color-primary-contrast: #08203D;
+  --color-ink: #9CC6F0;
+  --color-mint: #182A3F;
+  --color-mint-strong: #213B58;
 
-  --color-success: #5FD07A;
-  --color-success-bg: #0F2E1A;
-  --color-review: #E7B14F;
-  --color-review-bg: #382A10;
-  --color-danger: #F08A8E;
-  --color-danger-bg: #3A1719;
+  --color-success: #6FCF8A;
+  --color-success-bg: #11291A;
+  --color-review: #E3B04B;
+  --color-review-bg: #33260C;
+  --color-danger: #F28B90;
+  --color-danger-bg: #3A181A;
 
   --color-known-bg: var(--color-success-bg);
-  --color-known-border: #1C4A2C;
-  --color-known-fill: #5FD07A;
+  --color-known-border: #1E4A2E;
+  --color-known-fill: #6FCF8A;
   --color-known-contrast: #06210F;
 
-  --tone-blue: #82A9F2;   --tone-blue-bg: #17233C;
-  --tone-cyan: #5CC4DA;   --tone-cyan-bg: #10303A;
-  --tone-amber: #E7B14F;  --tone-amber-bg: #382A10;
-  --tone-violet: #B79BEA; --tone-violet-bg: #271D3B;
-  --tone-rose: #E58BB3;   --tone-rose-bg: #3A1626;
-  --tone-slate: #A9B4C2;  --tone-slate-bg: #22272E;
+  --tone-blue: #7DB3EA;   --tone-blue-bg: #182A3F;
+  --tone-cyan: #5CC3BC;   --tone-cyan-bg: #10302F;
+  --tone-violet: #B3A0E6; --tone-violet-bg: #251F3B;
+  --tone-rose: #DDA0CF;   --tone-rose-bg: #35202F;
+  --tone-amber: #E3B04B;  --tone-amber-bg: #33260C;
+  --tone-slate: #A9B4C2;  --tone-slate-bg: #232A31;
 
   --pos-noun-fg: #8DB1F2;  --pos-noun-bg: #182640;
   --pos-verb-fg: #F0A070;  --pos-verb-bg: #3A2213;
@@ -164,6 +207,14 @@
   --pos-prep-fg: #7FCB84;  --pos-prep-bg: #15301A;
   --pos-conj-fg: #E2C04D;  --pos-conj-bg: #352C0B;
   --pos-other-fg: #AAB3BE; --pos-other-bg: #262B31;
+
+  --hlt-yellow: #F2D04F;
+  --hlt-green: #55C985;
+  --hlt-purple: #A98BEA;
+  --hlt-pink: #EE86B7;
+  --hlt-alpha: 26%;
+  --pen-blue: #82A9F2;
+  --pen-red: #F08A8E;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
