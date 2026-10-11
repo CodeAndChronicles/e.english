@@ -10,6 +10,12 @@
     if (!listeners[eventName]) listeners[eventName] = [];
     listeners[eventName].push(cb);
   }
+  function off(eventName, fn) {
+    const arr = listeners[eventName];
+    if (!arr) return;
+    const i = arr.indexOf(fn);
+    if (i !== -1) arr.splice(i, 1);
+  }
   function emit(eventName, data) {
     const arr = listeners[eventName];
     if (!arr) return;
@@ -26,10 +32,14 @@
     quizHistory: 'eenglish.quizHistory',
     theme: 'eenglish.theme',
     themeColor: 'eenglish.themeColor',
-    keepAwake: 'eenglish.keepAwake'
+    keepAwake: 'eenglish.keepAwake',
+    fontMode: 'eenglish.fontMode'
   };
+  // Font style (Settings): 'o2' = headings Bold + body Regular (default), 'regular', 'bold'.
+  const FONT_MODES = ['o2', 'regular', 'bold'];
+  const DEFAULT_FONT_MODE = 'o2';
   // 8 accent palettes: 4 deep + 4 soft (see CSS/root.css). "default" is not a
-  // palette — it means "no accent picked": the multi-color default look.
+  // palette — it means "no accent picked": the calm default look.
   const THEME_COLORS = ['midnight', 'plum', 'petrol', 'umber', 'sky', 'lavender', 'rose', 'sand'];
   const DEFAULT_COLOR = 'default';
   // Accent names saved by earlier versions → nearest new palette (or the
@@ -76,16 +86,21 @@
      version's cache (if present) keeps its app shell but loses its cached
      lesson content, so content is always re-fetched fresh after a change. */
   const APP_META_KEY = 'eenglish.app';
+  // Two DIFFERENT numbers (see version.js): the app release and the JavaScript
+  // loading revision. Either one changing means "start from fresh caches".
   const CURRENT_VERSION = String(global.EE_MODEL_VERSION || '');
+  const CURRENT_JS = String(global.EE_JS_VERSION || '');
+  const CURRENT_SIGNATURE = CURRENT_VERSION + '|' + CURRENT_JS;   // what "the code running right now" is
   const CACHE_PREFIX = global.EE_CACHE_PREFIX || 'e-english-';
-  const CACHE_NAME = global.EE_CACHE_NAME || (CACHE_PREFIX + 'v' + CURRENT_VERSION);
-  const versionInfo = { current: CURRENT_VERSION, previous: null, changed: false };
+  const CACHE_NAME = global.EE_CACHE_NAME || (CACHE_PREFIX + 'v' + CURRENT_VERSION + (CURRENT_JS ? '-js' + CURRENT_JS : ''));
+  const versionInfo = { current: CURRENT_VERSION, js: CURRENT_JS, previous: null, previousJs: null, changed: false };
 
   function readAppMeta() {
     const m = readLS(APP_META_KEY, null);
-    if (!m || typeof m !== 'object' || Array.isArray(m)) return { version: null, history: [] };
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return { version: null, js: null, history: [] };
     return {
       version: typeof m.version === 'string' ? m.version : null,
+      js: typeof m.js === 'string' ? m.js : null,       // markers saved before the JS loading version existed have none
       history: Array.isArray(m.history) ? m.history.slice(-10) : []
     };
   }
@@ -112,15 +127,16 @@
     if (!CURRENT_VERSION) return Promise.resolve(false);
     const meta = readAppMeta();
     versionInfo.previous = meta.version;
-    if (meta.version === CURRENT_VERSION) return Promise.resolve(false);
+    versionInfo.previousJs = meta.js;
+    if (meta.version === CURRENT_VERSION && meta.js === CURRENT_JS) return Promise.resolve(false);
     return invalidateAppCaches().then(function () {
       // Only real transitions are recorded. A missing marker means either a
       // first run or an app older than versioning — the previous version is
       // unknown, so nothing is invented for it.
       const history = meta.version !== null
-        ? meta.history.concat([{ from: meta.version, to: CURRENT_VERSION, at: Date.now() }]).slice(-10)
+        ? meta.history.concat([{ from: meta.version, to: CURRENT_VERSION, fromJs: meta.js, toJs: CURRENT_JS, at: Date.now() }]).slice(-10)
         : meta.history;
-      writeLS(APP_META_KEY, { version: CURRENT_VERSION, history: history });
+      writeLS(APP_META_KEY, { version: CURRENT_VERSION, js: CURRENT_JS, history: history });
       versionInfo.changed = true;
       return true;
     });
@@ -131,7 +147,7 @@
      records) lives in JavaScript/quiz-engine.js, loaded before this file.
      ux.js only keeps the state, saves history and updates Review. */
   const Engine = global.QuizEngine;
-  if (!Engine) console.error('[E.English] quiz-engine.js did not load — quizzes are unavailable.');
+  if (!Engine) console.error('[e.english] quiz-engine.js did not load — quizzes are unavailable.');
   const QUIZ_HISTORY_LIMIT = 40;
   // Every stored record is upgraded to the current shape (and malformed ones
   // dropped). Each record is a self-contained snapshot, so it never depends
@@ -164,7 +180,8 @@
     freshLoad: false, // true for the load right after a version change → bypass the HTTP cache
     theme: readLS(LS_KEYS.theme, null), // 'light' | 'dark' | 'system' | null (null behaves as 'system')
     themeColor: normalizeColor(readLS(LS_KEYS.themeColor, null)),
-    keepAwake: readLS(LS_KEYS.keepAwake, false)
+    keepAwake: readLS(LS_KEYS.keepAwake, false),
+    fontMode: readLS(LS_KEYS.fontMode, null)
   };
   // History saved by an earlier version is upgraded once, in storage too.
   (function migrateQuizHistory() {
@@ -754,6 +771,11 @@
     return { timeLeft: q.timeLeft, timeLimit: limit, state: Engine.timerState(q.timeLeft, limit) };
   }
 
+  /* A quiz is a SESSION: the questions are picked at random ONCE, their order
+     is then fixed, and the learner moves freely between them (Previous / Next /
+     the number indicator). Each question is unanswered, answered (the learner
+     typed something — not "correct") or skipped (left empty). Nothing is judged
+     until finishQuiz(), so the quiz stays blind until the results. */
   function beginQuiz(mode, ref) {
     if (!Engine) return false;
     const questions = Engine.selectQuestions(collectVocabularyFor(ref.unit, ref.lessonKey), mode, quizContext());
@@ -763,7 +785,6 @@
     state.quiz = { session: session, timerId: null, timeLeft: session.estimate.timeLimit };
     emit('quiz-started', { mode: mode, total: questions.length, timeLeft: state.quiz.timeLeft, estimate: session.estimate });
     emit('quiz-tick', tickPayload());
-    emit('quiz-question', currentQuizQuestion());
 
     // The clock is the real time since the start (not "minus one per tick"),
     // so a throttled background tab can't stretch the time limit.
@@ -776,28 +797,71 @@
     return true;
   }
 
-  // Read-only view for the UI (it never touches the session directly).
+  function quizOverview() {
+    if (!state.quiz) return null;
+    const ov = Engine.overview(state.quiz.session);
+    // `label` is what the desktop word panel shows (the prompt by default —
+    // see QuizEngine.PANEL); the expected English word is never handed to the UI otherwise.
+    ov.items.forEach(function (it) { it.label = Engine.panelLabel(state.quiz.session.questions[it.index]); });
+    ov.index = state.quiz.session.index;
+    return ov;
+  }
+
+  // Read-only view for the UI. The question carries its prompt and the
+  // learner's own answer — never the expected word.
   function getCurrentQuiz() {
     const q = state.quiz;
     if (!q) return null;
     const s = q.session;
+    const cur = Engine.currentQuestion(s);
+    const ov = quizOverview();
     return {
       mode: s.mode, ref: s.ref, index: s.index, total: s.questions.length,
-      question: Engine.currentQuestion(s), questions: s.questions,
+      question: cur ? { id: cur.id, wordId: cur.wordId, meaning: cur.meaning, pos: cur.pos, answer: cur.answer, state: cur.state } : null,
+      items: ov.items, answered: ov.answered, skipped: ov.skipped, unanswered: ov.unanswered, unresolved: ov.unresolved,
       timeLeft: q.timeLeft, timeLimit: s.estimate.timeLimit, estimate: s.estimate,
       timerState: Engine.timerState(q.timeLeft, s.estimate.timeLimit)
     };
   }
 
-  function currentQuizQuestion() {
+  // The learner typed (or cleared) something in the CURRENT question.
+  function setQuizAnswer(text) {
     if (!state.quiz) return null;
     const s = state.quiz.session;
-    const q = Engine.currentQuestion(s);
-    if (!q) return null;
-    return { index: s.index, total: s.questions.length, meaning: q.meaning, qid: q.qid };
+    const before = s.questions[s.index].state;
+    Engine.setAnswer(s, s.index, text);
+    if (s.questions[s.index].state !== before) emit('quiz-overview', quizOverview());
+    return s.questions[s.index].state;
   }
 
-  // The Review rule for one answered question comes from the engine
+  // Go to any question (number indicator, Previous/Next, desktop panel).
+  // Leaving an empty question skips it automatically; answers are never cleared.
+  function goToQuestion(index) {
+    if (!state.quiz) return null;
+    const r = Engine.goTo(state.quiz.session, index);
+    if (r.moved) { emit('quiz-question', getCurrentQuiz()); emit('quiz-overview', quizOverview()); }
+    return state.quiz.session.index;
+  }
+  function nextQuizQuestion() {
+    if (!state.quiz) return null;
+    const s = state.quiz.session;
+    if (s.index >= s.questions.length - 1) return null;       // the UI shows the completion summary instead
+    return goToQuestion(s.index + 1);
+  }
+  function previousQuizQuestion() {
+    if (!state.quiz) return null;
+    const s = state.quiz.session;
+    if (s.index <= 0) return null;
+    return goToQuestion(s.index - 1);
+  }
+  // Leaving the question screen for the completion summary also leaves the
+  // current question (an empty one becomes skipped, like any other move).
+  function leaveCurrentQuestion() {
+    if (!state.quiz) return;
+    if (Engine.leaveQuestion(state.quiz.session, state.quiz.session.index)) emit('quiz-overview', quizOverview());
+  }
+
+  // The Review rule for one graded question comes from the engine
   // (correct → clear the quiz-made flag, near miss → leave Review alone,
   // wrong / skipped → add with that reason). Applied here because Review
   // state lives here. Returns true if Review changed (not yet saved).
@@ -809,42 +873,19 @@
     return false;
   }
 
-  function recordAnswer(entry) {
-    if (!entry) return null;
-    if (applyReviewRule(entry)) {
-      persistReview();
-      emit('state-changed', { wordId: entry.wordId, kind: 'autoReview' });
-    }
-    return entry.result;   // 'correct' | 'near' | 'wrong' | 'skipped'
-  }
-  function submitQuizAnswer(userAnswer) {
-    if (!state.quiz) return null;
-    return recordAnswer(Engine.answerCurrent(state.quiz.session, userAnswer));
-  }
-  function skipQuizQuestion() {
-    if (!state.quiz) return null;
-    return recordAnswer(Engine.skipCurrent(state.quiz.session));
-  }
-
-  function nextQuizQuestion() {
-    if (!state.quiz) return null;
-    if (!Engine.advance(state.quiz.session)) { finishQuiz(false); return null; }
-    const q = currentQuizQuestion();
-    emit('quiz-question', q);
-    return q;
-  }
-
   function finishQuiz(timedOut) {
     if (!state.quiz) return null;
     const q = state.quiz;
     if (q.timerId) { clearInterval(q.timerId); q.timerId = null; }
+    Engine.leaveQuestion(q.session, q.session.index);
 
-    // Anything not answered by now (time ran out, or the quiz was ended early)
-    // counts as skipped — and skipped questions enter Review like any other.
-    const reviewChanged = Engine.expireRemaining(q.session).map(applyReviewRule).some(Boolean);
+    // Grading happens here, once, for the whole session: only now does a
+    // question become correct / near miss / wrong, and wrong + skipped questions
+    // enter Review (one save, one event).
+    const record = Engine.buildRecord(q.session, { now: Date.now(), timedOut: !!timedOut });
+    const reviewChanged = record.answers.map(applyReviewRule).some(Boolean);
     if (reviewChanged) { persistReview(); emit('state-changed', { kind: 'quiz-review' }); }
 
-    const record = Engine.buildRecord(q.session, { now: Date.now(), timedOut: !!timedOut });
     state.quizHistory.push(record);
     if (state.quizHistory.length > QUIZ_HISTORY_LIMIT) state.quizHistory = state.quizHistory.slice(-QUIZ_HISTORY_LIMIT);
     writeLS(LS_KEYS.quizHistory, state.quizHistory);
@@ -869,15 +910,29 @@
       t = setTimeout(function () { t = null; fn.apply(self, args); }, ms);
     };
   }
+  // Text used to compare a search query with a word or a meaning. (This helper
+  // was lost when the quiz logic moved to quiz-engine.js, which silently broke
+  // Search — a ReferenceError inside the debounced callback.) It is deliberately
+  // forgiving: case, extra spaces, and for Arabic meanings the diacritics,
+  // tatweel and the common spelling variants of alef / yeh / teh marbuta.
+  function normalize(s) {
+    if (s == null) return '';
+    return String(s).normalize('NFC').toLowerCase().trim()
+      .replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+      .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627')
+      .replace(/\u0649/g, '\u064A')
+      .replace(/\u0629/g, '\u0647')
+      .replace(/\s+/g, ' ');
+  }
   const SEARCH_DEBOUNCE_MS = 300;
   const runSearch = debounce(function (query) {
     state.lastSearchQuery = query;
-    const q = Engine.normalizeAnswer(query);
+    const q = normalize(query);
     if (!q) { emit('search-results', { query: query, results: [] }); return; }
     const exact = [], starts = [], includes = [];
     for (let i = 0; i < state.searchIndex.length; i++) {
       const item = state.searchIndex[i];
-      const w = Engine.normalizeAnswer(item.word), m = Engine.normalizeAnswer(item.meaning);
+      const w = normalize(item.word), m = normalize(item.meaning);
       if (w === q || m === q) exact.push(item);
       else if (w.indexOf(q) === 0 || m.indexOf(q) === 0) starts.push(item);
       else if (w.indexOf(q) !== -1 || m.indexOf(q) !== -1) includes.push(item);
@@ -913,36 +968,55 @@
      stats, so Synonyms/Idioms/Derivatives words never dilute the
      "Vocabulary" percentage — they're still counted in the overall
      figure, since known/review state is generic across every section type. */
-  function getStatistics() {
-    let vocabTotal = 0, vocabKnown = 0;
-    let overallTotal = 0, overallKnown = 0;
-    // Per content type (vocabulary, synonyms_antonyms, idioms, derivatives,
-    // and any future/unknown type): { total, known, progress }.
-    const byType = {};
-    state.units.forEach(function (unit) {
-      unit.lessons.forEach(function (lesson) {
-        lesson.sections.forEach(function (section) {
-          section.groups.forEach(function (group, gi) {
-            group.words.forEach(function (w) {
-              overallTotal++;
-              if (!byType[section.type]) byType[section.type] = { total: 0, known: 0, progress: 0 };
-              byType[section.type].total++;
-              if (state.known[w.wordId]) { overallKnown++; byType[section.type].known++; }
-              if (section.type === 'vocabulary') {
-                vocabTotal++;
-                if (state.known[w.wordId]) vocabKnown++;
-              }
-            });
+  // The ONE place that counts learnable words: every word of every section
+  // (Vocabulary, Synonyms & Antonyms, Idioms & Phrasal Verbs, Derivatives and
+  // any future type) in every lesson of the unit, with its learned state.
+  function tallyUnit(unit) {
+    const t = { total: 0, known: 0, byType: {} };
+    unit.lessons.forEach(function (lesson) {
+      lesson.sections.forEach(function (section) {
+        const bt = t.byType[section.type] || (t.byType[section.type] = { total: 0, known: 0 });
+        section.groups.forEach(function (group) {
+          group.words.forEach(function (w) {
+            t.total++; bt.total++;
+            if (state.known[w.wordId]) { t.known++; bt.known++; }
           });
         });
+      });
+    });
+    return t;
+  }
+  function progressOf(t) { return { total: t.total, known: t.known, progress: t.total > 0 ? t.known / t.total : 0 }; }
+
+  // Progress of a whole unit (all its lessons and all word types) — used by
+  // the Home unit cards. Same counting as Statistics, so they always agree.
+  function getUnitProgress(unitNum) {
+    const unit = state.units.find(function (u) { return u.unit === unitNum; });
+    return unit ? progressOf(tallyUnit(unit)) : { total: 0, known: 0, progress: 0 };
+  }
+
+  function getStatistics() {
+    let overallTotal = 0, overallKnown = 0;
+    // Per content type (vocabulary, synonyms_antonyms, idioms, derivatives,
+    // and any future/unknown type): { total, known, progress }; per unit too.
+    const byType = {}, byUnit = {};
+    state.units.forEach(function (unit) {
+      const t = tallyUnit(unit);
+      byUnit[unit.unit] = progressOf(t);
+      overallTotal += t.total; overallKnown += t.known;
+      Object.keys(t.byType).forEach(function (type) {
+        const b = byType[type] || (byType[type] = { total: 0, known: 0, progress: 0 });
+        b.total += t.byType[type].total; b.known += t.byType[type].known;
       });
     });
     Object.keys(byType).forEach(function (t) {
       byType[t].progress = byType[t].total > 0 ? byType[t].known / byType[t].total : 0;
     });
+    const vocab = byType.vocabulary || { total: 0, known: 0, progress: 0 };
     return {
       byType: byType,
-      vocabulary: { total: vocabTotal, known: vocabKnown, progress: vocabTotal > 0 ? vocabKnown / vocabTotal : 0 },
+      byUnit: byUnit,
+      vocabulary: { total: vocab.total, known: vocab.known, progress: vocab.progress },
       overall: { total: overallTotal, known: overallKnown, progress: overallTotal > 0 ? overallKnown / overallTotal : 0 },
       reviewWords: getReviewWords()
     };
@@ -991,12 +1065,26 @@
     } catch (e) {}
   })();
 
+  /* ---------------- Font style ----------------
+     One persisted preference, applied by ui.js as <html data-font="…">. The
+     CSS (root.css) turns the mode into two weight roles — body and heading —
+     so every screen follows it without any per-page font code. */
+  function getFontMode() {
+    return FONT_MODES.indexOf(state.fontMode) !== -1 ? state.fontMode : DEFAULT_FONT_MODE;
+  }
+  function setFontMode(mode) {
+    if (FONT_MODES.indexOf(mode) === -1) return;
+    state.fontMode = mode;
+    writeLS(LS_KEYS.fontMode, mode);
+    emit('font-mode-changed', mode);
+  }
+
   /* ---------------- Theme color (Settings: 8 accents + default) ---------------- */
   // Returns a palette name, or 'default' when no accent is picked.
   function getThemeColor() {
     return state.themeColor && THEME_COLORS.indexOf(state.themeColor) !== -1 ? state.themeColor : DEFAULT_COLOR;
   }
-  // Accepts a palette name, or 'default' to go back to the multi-color look.
+  // Accepts a palette name, or 'default' to go back to the calm default look.
   function setThemeColor(color) {
     if (color === DEFAULT_COLOR) {
       state.themeColor = null;
@@ -1041,13 +1129,14 @@
       quizHistory: state.quizHistory,
       theme: getThemePreference(),
       themeColor: getThemeColor(),
+      fontMode: getFontMode(),
       keepAwake: state.keepAwake
     };
   }
   function isPlainObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
   function importAllData(obj) {
     if (!obj || typeof obj !== 'object') return false;
-    const recognized = ['known', 'manualReview', 'autoReview', 'quizHistory', 'theme', 'themeColor', 'keepAwake'];
+    const recognized = ['known', 'manualReview', 'autoReview', 'quizHistory', 'theme', 'themeColor', 'fontMode', 'keepAwake'];
     if (!recognized.some(function (k) { return obj[k] !== undefined; })) return false;
     try {
       let applied = false; // only report success if something valid was actually imported
@@ -1064,11 +1153,14 @@
         if (importedColor) writeLS(LS_KEYS.themeColor, importedColor); else { try { localStorage.removeItem(LS_KEYS.themeColor); } catch (e) {} }
         applied = true;
       }
+      const fontChanged = FONT_MODES.indexOf(obj.fontMode) !== -1;
+      if (fontChanged) { state.fontMode = obj.fontMode; writeLS(LS_KEYS.fontMode, state.fontMode); applied = true; }
       if (typeof obj.keepAwake === 'boolean') { state.keepAwake = obj.keepAwake; writeLS(LS_KEYS.keepAwake, state.keepAwake); applied = true; }
       // Same rule as at startup: stored progress must match the content.
       reconcileStoredData();
       if (themeChanged) { emit('theme-preference-changed', getThemePreference()); emit('theme-changed', getTheme()); }
       if (colorChanged) emit('theme-color-changed', getThemeColor());
+      if (fontChanged) emit('font-mode-changed', getFontMode());
       if (!applied) return false;
       emit('data-imported', {});
       return true;
@@ -1083,6 +1175,7 @@
     state.quizHistory = [];
     state.theme = null;
     state.themeColor = null;
+    state.fontMode = null;
     state.keepAwake = false;
     Object.keys(LS_KEYS).forEach(function (k) {
       try { localStorage.removeItem(LS_KEYS[k]); } catch (e) {}
@@ -1090,17 +1183,222 @@
     emit('data-reset', {});
   }
 
+  /* ---------------- Update refresh cycle ----------------
+     Builds on the version system above (version.js → EE_MODEL_VERSION, the
+     'eenglish.app' marker, versioned caches in sw.js). It adds the missing
+     piece: noticing that the SERVER has a different version than the one
+     this page is running, and refreshing onto it — safely.
+
+       running  = the version of the code executing now (EE_MODEL_VERSION)
+       latest   = the version in a freshly fetched version.js (network-first
+                  in sw.js for the "?check=" request; never served from cache)
+
+     When latest !== running (newer OR older — 5→6, 6→7, 7→5 all count):
+       1. a NEW update (a latest we have not tried to reach yet) resets
+          refreshTimes to 0 and remembers it as the target;
+       2. if refreshTimes is already 3 → STOP (nothing is deleted or reset);
+       3. otherwise wait UPDATE_WAIT_MS so the service worker can fetch and
+          activate the new files, then — never during a quiz — count the
+          attempt (refreshTimes + 1, saved BEFORE reloading) and reload.
+     After the reload the check runs again: if the page now runs the latest
+     version it simply stops; if not, it retries — at most 3 times in total.
+
+     refreshTimes (a fixed localStorage key) is only ever
+       • set to 0 when a new update is detected,
+       • set to 0 when the learner refreshes the page by hand (a reload that
+         this code did not start — see detectManualRefresh),
+       • incremented right before an automatic reload.
+     It is never reset merely because the page reloaded, and never deleted.
+
+     Offline (or an unreadable version.js): nothing happens and no attempt is
+     used; when the connection returns the check runs again. A per-tab-session
+     hard cap (SESSION_HARD_CAP) is a second, independent brake.
+
+     This touches only app-layer keys ('refreshTimes', 'eenglish.updateTarget')
+     — never the learner's progress, review lists, history or preferences. */
+  const REFRESH_KEY = 'refreshTimes';
+  const UPDATE_TARGET_KEY = 'eenglish.updateTarget';
+  const AUTO_RELOAD_FLAG = 'eenglish.autoReload';        // sessionStorage: "this reload was ours"
+  const SESSION_RELOADS_KEY = 'eenglish.sessionReloads'; // sessionStorage: hard cap per tab session
+  const MAX_REFRESH_ATTEMPTS = 3;
+  const SESSION_HARD_CAP = 6;
+  const UPDATE_WAIT_MS = 3000;       // time for the new files to arrive before a refresh attempt
+  const QUIZ_IDLE_POLL_MS = 2000;    // a refresh never interrupts a running quiz
+  const VERSION_FILE = 'JavaScript/version.js';
+
+  const updater = {
+    running: false,
+    hooks: {
+      reload: function () { global.location.reload(); },
+      isOnline: function () { return !global.navigator || global.navigator.onLine !== false; },
+      fetchText: function (url) {
+        return global.fetch(url, { cache: 'no-store' }).then(function (r) { return r && r.ok ? r.text() : null; });
+      },
+      navigationType: function () {
+        try {
+          const e = global.performance && global.performance.getEntriesByType && global.performance.getEntriesByType('navigation')[0];
+          if (e && e.type) return e.type;
+          if (global.performance && global.performance.navigation) return global.performance.navigation.type === 1 ? 'reload' : 'navigate';
+        } catch (e) {}
+        return 'navigate';
+      },
+      waitMs: UPDATE_WAIT_MS
+    }
+  };
+
+  function readRefreshTimes() {
+    let n = NaN;
+    try { n = parseInt(localStorage.getItem(REFRESH_KEY), 10); } catch (e) {}
+    return isFinite(n) && n >= 0 ? n : 0;
+  }
+  function writeRefreshTimes(n) {
+    try { localStorage.setItem(REFRESH_KEY, String(n)); } catch (e) {}
+  }
+  function readUpdateTarget() {
+    try { return localStorage.getItem(UPDATE_TARGET_KEY); } catch (e) { return null; }
+  }
+  function writeUpdateTarget(v) {
+    try { localStorage.setItem(UPDATE_TARGET_KEY, String(v)); } catch (e) {}
+  }
+  // "10|2" = app version 10 + JavaScript loading version 2. A change in EITHER
+  // part is an update. (A version.js without EE_JS_VERSION compares the app
+  // version only.)
+  function parseVersionText(text) {
+    const t = String(text || '');
+    const m = /EE_MODEL_VERSION\s*=\s*['"]([^'"]+)['"]/.exec(t);
+    if (!m) return null;
+    const j = /EE_JS_VERSION\s*=\s*['"]([^'"]+)['"]/.exec(t);
+    return m[1] + '|' + (j ? j[1] : CURRENT_JS);
+  }
+
+  // PURE decision. No storage, no network, no reload — easy to test.
+  //   in : { running, latest, online, refreshTimes, target }
+  //   out: { action: 'none' | 'refresh' | 'stop', reason, newUpdate,
+  //          refreshTimes (value to store), attempt (1..max) when refreshing, target }
+  function planUpdate(input) {
+    const running = input.running, latest = input.latest;
+    const times = input.refreshTimes, target = input.target;
+    if (!input.online) return { action: 'none', reason: 'offline', newUpdate: false, refreshTimes: times, target: target };
+    if (!latest) return { action: 'none', reason: 'unknown-version', newUpdate: false, refreshTimes: times, target: target };
+    if (latest === running) return { action: 'none', reason: 'up-to-date', newUpdate: false, refreshTimes: times, target: latest };
+    const newUpdate = target !== latest;
+    const used = newUpdate ? 0 : times;
+    if (used >= MAX_REFRESH_ATTEMPTS) return { action: 'stop', reason: 'max-attempts', newUpdate: newUpdate, refreshTimes: used, target: latest };
+    return { action: 'refresh', reason: newUpdate ? 'new-update' : 'retry', newUpdate: newUpdate, refreshTimes: used, attempt: used + 1, target: latest };
+  }
+
+  // A reload that the learner started (pull-to-refresh, F5, the browser's
+  // button) gives them a fresh set of attempts. Our own automatic reloads
+  // leave a one-shot flag in sessionStorage so they are not mistaken for it.
+  function detectManualRefresh() {
+    let ours = false;
+    try { ours = sessionStorage.getItem(AUTO_RELOAD_FLAG) === '1'; sessionStorage.removeItem(AUTO_RELOAD_FLAG); } catch (e) {}
+    const manual = !ours && updater.hooks.navigationType() === 'reload';
+    if (manual) writeRefreshTimes(0);
+    return manual;
+  }
+
+  function fetchLatestVersion() {
+    if (!updater.hooks.isOnline()) return Promise.resolve(null);
+    // "?check=" is what makes sw.js go to the network for this one request.
+    return Promise.resolve().then(function () {
+      return updater.hooks.fetchText(VERSION_FILE + '?check=' + Date.now());
+    }).then(parseVersionText).catch(function () { return null; });
+  }
+
+  // Wait up to ms for the new files; resolves early when the service worker
+  // reports it has activated them.
+  function waitForNewFiles(ms) {
+    if (!ms) return Promise.resolve();
+    return new Promise(function (resolve) {
+      let done = false;
+      let timer = null;
+      function finish() { if (done) return; done = true; clearTimeout(timer); off('update-files-ready', finish); resolve(); }
+      timer = setTimeout(finish, ms);
+      on('update-files-ready', finish);
+      try {
+        const sw = global.navigator && global.navigator.serviceWorker;
+        if (sw && sw.getRegistration) sw.getRegistration().then(function (r) { if (r && r.update) r.update(); }).catch(function () {});
+      } catch (e) {}
+    });
+  }
+  function waitForQuizIdle() {
+    return new Promise(function (resolve) {
+      (function poll() { if (state.quiz) setTimeout(poll, QUIZ_IDLE_POLL_MS); else resolve(); })();
+    });
+  }
+  function sessionReloads() {
+    try { return parseInt(sessionStorage.getItem(SESSION_RELOADS_KEY), 10) || 0; } catch (e) { return 0; }
+  }
+
+  // One full check. `opts.latest` (from the service worker's message) skips
+  // the network fetch; `opts.skipWait` skips the wait for new files.
+  function checkForUpdate(opts) {
+    opts = opts || {};
+    if (updater.running) return Promise.resolve({ action: 'none', reason: 'busy' });
+    if (!CURRENT_VERSION) return Promise.resolve({ action: 'none', reason: 'no-version' });
+    updater.running = true;
+    return (opts.latest ? Promise.resolve(String(opts.latest).indexOf('|') === -1 ? String(opts.latest) + '|' + CURRENT_JS : String(opts.latest)) : fetchLatestVersion()).then(function (latest) {
+      const plan = planUpdate({
+        running: CURRENT_SIGNATURE, latest: latest, online: updater.hooks.isOnline(),
+        refreshTimes: readRefreshTimes(), target: readUpdateTarget()
+      });
+      if (plan.target && plan.target !== readUpdateTarget()) writeUpdateTarget(plan.target);
+      if (plan.newUpdate) writeRefreshTimes(0);                 // new update → a fresh cycle
+      if (plan.action === 'stop') emit('update-stopped', plan);
+      if (plan.action !== 'refresh') { updater.running = false; return plan; }
+      if (sessionReloads() >= SESSION_HARD_CAP) { updater.running = false; return Object.assign({}, plan, { action: 'stop', reason: 'session-cap' }); }
+      emit('update-pending', plan);
+      return waitForNewFiles(opts.skipWait ? 0 : updater.hooks.waitMs).then(waitForQuizIdle).then(function () {
+        writeRefreshTimes(plan.attempt);                         // counted BEFORE reloading
+        try {
+          sessionStorage.setItem(AUTO_RELOAD_FLAG, '1');
+          sessionStorage.setItem(SESSION_RELOADS_KEY, String(sessionReloads() + 1));
+        } catch (e) {}
+        emit('update-refreshing', plan);
+        updater.running = false;
+        updater.hooks.reload();
+        return plan;
+      });
+    }).catch(function (e) { updater.running = false; console.error(e); return { action: 'none', reason: 'error' }; });
+  }
+
+  // Called once at startup (ui.js) and wires the two later triggers: the
+  // service worker announcing a new cache, and the connection coming back.
+  let updateWatcherStarted = false;
+  function startUpdateWatcher() {
+    if (updateWatcherStarted) return Promise.resolve(null);
+    updateWatcherStarted = true;
+    try { if (localStorage.getItem(REFRESH_KEY) === null) writeRefreshTimes(0); } catch (e) {}   // the key always exists
+    detectManualRefresh();
+    try {
+      const sw = global.navigator && global.navigator.serviceWorker;
+      if (sw && sw.addEventListener) {
+        sw.addEventListener('message', function (ev) {
+          const d = ev && ev.data;
+          if (!d || d.type !== 'EE_CACHE_ACTIVATED') return;
+          emit('update-files-ready', d);
+          checkForUpdate({ latest: d.version, skipWait: true });
+        });
+        if (sw.startMessages) sw.startMessages();   // make sure messages queued before this listener are delivered
+      }
+    } catch (e) {}
+    try { global.addEventListener('online', function () { checkForUpdate(); }); } catch (e) {}
+    return checkForUpdate();
+  }
+
   /* ---------------- Public API ---------------- */
   global.UX = {
     on: on, emit: emit,
     loadAll: loadAll,
     getUnits: function () { return state.units; },
-    getStatistics: getStatistics,
+    getStatistics: getStatistics, getUnitProgress: getUnitProgress,
     getLessonVocabularyProgress: getLessonVocabularyProgress,
     getMissingSections: function () { return state.missingSections.slice(); },
     getTheme: getTheme, getThemePreference: getThemePreference, setTheme: setTheme,
-    getAppVersionInfo: function () { return { current: versionInfo.current, previous: versionInfo.previous, changed: versionInfo.changed, history: readAppMeta().history }; },
+    getAppVersionInfo: function () { return { current: versionInfo.current, js: versionInfo.js, previous: versionInfo.previous, previousJs: versionInfo.previousJs, changed: versionInfo.changed, history: readAppMeta().history }; },
     reconcileStoredData: reconcileStoredData, getReviewWords: getReviewWords, getReviewSource: getReviewSource,
+    getFontMode: getFontMode, setFontMode: setFontMode, getFontModes: function () { return FONT_MODES.slice(); },
     getThemeColor: getThemeColor, setThemeColor: setThemeColor, getThemeColors: function () { return THEME_COLORS.slice(); },
     getKeepAwake: getKeepAwake, setKeepAwake: setKeepAwake,
     getQuizHistory: function () { return state.quizHistory.slice(); },
@@ -1111,8 +1409,13 @@
     toggleKnown: toggleKnown, toggleManualReview: toggleManualReview, toggleReview: toggleReview, setReview: setReview, setAutoReview: setAutoReview,
     setKnown: setKnown, setGroupKnown: setGroupKnown, getGroupTriState: getGroupTriState,
     startFullQuiz: startFullQuiz, startSelectedQuiz: startSelectedQuiz, canStartSelectedQuiz: canStartSelectedQuiz,
-    submitQuizAnswer: submitQuizAnswer, nextQuizQuestion: nextQuizQuestion, skipQuizQuestion: skipQuizQuestion,
+    setQuizAnswer: setQuizAnswer, goToQuestion: goToQuestion, nextQuizQuestion: nextQuizQuestion, previousQuizQuestion: previousQuizQuestion,
+    leaveCurrentQuestion: leaveCurrentQuestion, getQuizOverview: quizOverview,
     finishQuiz: finishQuiz, abortQuiz: abortQuiz, getCurrentQuiz: getCurrentQuiz,
-    search: search, resolveWordLocation: resolveWordLocation
+    search: search, resolveWordLocation: resolveWordLocation,
+    // Update refresh cycle (see the section above). planUpdate is pure; `updater`
+    // exposes the hooks (reload / network / navigation type) for tests.
+    startUpdateWatcher: startUpdateWatcher, checkForUpdate: checkForUpdate, planUpdate: planUpdate,
+    updater: updater, UPDATE_CONSTANTS: { REFRESH_KEY: REFRESH_KEY, MAX_REFRESH_ATTEMPTS: MAX_REFRESH_ATTEMPTS, UPDATE_WAIT_MS: UPDATE_WAIT_MS, SESSION_HARD_CAP: SESSION_HARD_CAP }
   };
 })(window);

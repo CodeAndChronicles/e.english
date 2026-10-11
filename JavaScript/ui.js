@@ -39,6 +39,7 @@
   let lessonProgressRef = null; // { unit, lessonKey, fillEl, textEl } — live-updated, not rebuilt
   let lessonQuizRef = null; // { unit, lessonKey, selectedBtn, selectedMeta, hintEl } — Selected Quiz availability + estimate, live-updated
   let statsRefs = null; // live-updatable stats DOM refs, set by renderStatistics()
+  let unitProgressRefs = null; // unitNum → { fill, pct, bar } for the Home unit cards
 
   // Both nav bars (bottom nav for phones, side nav for large screens) are
   // always kept in the same state — CSS alone decides which one is
@@ -103,6 +104,12 @@
     syncThemeButton();
     syncMetaThemeColor();
   }
+  // Font style (O2 / Regular / Bold) — one <html data-font> attribute; root.css turns
+  // it into the two weight roles every screen already uses.
+  function applyFontMode(mode) {
+    document.documentElement.setAttribute('data-font', mode || 'o2');
+  }
+
   // Accent palette — independent from light/dark; see CSS/root.css. The
   // default look (no accent picked) has NO data-color attribute at all, so
   // nothing can leak a forced accent into it.
@@ -175,6 +182,7 @@
      (:checked / :indeterminate), per "checkbox state must be obvious". */
   function customCheckbox(opts) {
     const input = h('input', { type: 'checkbox', class: 'cb-input visually-hidden' });
+    if (opts.ariaLabel) input.setAttribute('aria-label', opts.ariaLabel);
     if (opts.checked) input.checked = true;
     if (opts.onchange) input.addEventListener('change', function () { opts.onchange(input.checked); });
     const box = h('span', { class: 'cb-box' }, [
@@ -240,9 +248,9 @@
     const units = UX.getUnits();
 
     el.screen.appendChild(h('header', { class: 'app-header' }, [
-      h('img', { src: 'Ui/Logo.png', alt: 'E.English', class: 'app-logo' }),
+      h('img', { src: 'Ui/Logo.png', alt: 'e.english', class: 'app-logo' }),
       h('div', {}, [
-        h('h1', { class: 'title-xl', text: 'E.English' }),
+        h('h1', { class: 'title-xl', text: 'e.english' }),
         h('p', { class: 'text-muted', text: 'Choose a unit to start studying' })
       ])
     ]));
@@ -255,16 +263,27 @@
     el.screen.appendChild(searchBox);
     el.screen.appendChild(h('div', { class: 'search-results', id: 'search-results' }));
 
+    unitProgressRefs = null;
     const list = h('div', { class: 'card-grid' });
     if (!units.length) {
       list.appendChild(h('p', { class: 'empty-note', text: 'No content is available right now.' }));
     } else {
+      unitProgressRefs = {};
       units.forEach(function (unit) {
-        list.appendChild(h('button', { class: 'nav-card', onclick: function () { renderUnit(unit.unit); } }, [
-          icon('library', 'nav-card-icon tone-blue'),
+        // Whole-unit progress: every lesson, every word type (UX.getUnitProgress
+        // uses the same counting as Statistics). One bar per UNIT — not per lesson.
+        const prog = UX.getUnitProgress(unit.unit);
+        const fill = h('div', { class: 'progress-fill' });
+        fill.style.width = pct(prog.progress);
+        const bar = h('div', { class: 'progress-bar progress-sm', role: 'progressbar', 'aria-label': 'Unit ' + unit.unit + ' progress', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(prog.progress * 100)) }, [fill]);
+        const pctEl = h('span', { class: 'unit-progress-pct', text: pctLabel(prog.progress) });
+        unitProgressRefs[unit.unit] = { fill: fill, pct: pctEl, bar: bar };
+        list.appendChild(h('button', { class: 'nav-card nav-card-unit tone-blue', onclick: function () { renderUnit(unit.unit); } }, [
+          icon('library', 'nav-card-icon'),
           h('div', { class: 'nav-card-text' }, [
             h('div', { class: 'nav-card-title', text: 'Unit ' + unit.unit }),
-            h('div', { class: 'nav-card-sub', text: plural(unit.lessons.length, 'lesson set', 'lesson sets') })
+            h('div', { class: 'nav-card-sub', text: plural(unit.lessons.length, 'lesson set', 'lesson sets') }),
+            h('div', { class: 'unit-progress' }, [bar, pctEl])
           ]),
           icon('chevron-right', 'nav-card-chevron')
         ]));
@@ -280,7 +299,12 @@
     if (!container) return;
     clear(container);
     const results = (payload && payload.results) || [];
-    if (!results.length) return;
+    if (!results.length) {
+      // Say so when a search finds nothing (instead of silently showing nothing).
+      const q = payload && payload.query ? String(payload.query).trim() : '';
+      if (q) container.appendChild(h('p', { class: 'empty-note search-empty', text: 'No words found for \u201C' + q + '\u201D.' }));
+      return;
+    }
     container.appendChild(h('div', { class: 'search-results-head', text: plural(results.length, 'result', 'results') }));
     results.forEach(function (r) {
       container.appendChild(h('button', { class: 'result-row', onclick: function () { navigateToWord(r.wordId); } }, [
@@ -310,7 +334,7 @@
     unit.lessons.forEach(function (lesson) {
       const key = lesson.lessons.join('-');
       list.appendChild(h('button', { class: 'nav-card', onclick: function () { renderLesson(unitNum, key); } }, [
-        icon('notebook-text', 'nav-card-icon tone-violet'),
+        icon('notebook-text', 'nav-card-icon tone-blue'),
         h('div', { class: 'nav-card-text' }, [
           h('div', { class: 'nav-card-title', text: 'Lesson ' + lesson.lessons.join('-') }),
           h('div', { class: 'nav-card-sub', text: plural(lesson.sections.length, 'section', 'sections') })
@@ -333,7 +357,7 @@
     if (!lesson) { renderUnit(unitNum); return; }
 
     el.screen.appendChild(h('header', { class: 'app-header' }, [
-      h('button', { class: 'icon-btn back-btn', onclick: function () { renderUnit(unitNum); } }, [icon('arrow-left')]),
+      h('button', { class: 'icon-btn back-btn', 'aria-label': 'Back to the unit', onclick: function () { renderUnit(unitNum); } }, [icon('arrow-left')]),
       h('h1', { class: 'title-lg', text: 'Unit ' + unitNum + ' · Lesson ' + lessonKey })
     ]));
 
@@ -412,7 +436,7 @@
       const groupsWrap = h('div', { class: 'groups-wrap' });
       section.groups.forEach(function (group, gi) {
         const forceOpen = !!(groupOfFocus && groupOfFocus.type === section.type && groupOfFocus.groupIdx === gi);
-        groupsWrap.appendChild(renderGroup(group, gi, forceOpen));
+        groupsWrap.appendChild(renderGroup(group, gi, forceOpen, section.type));
       });
       card.appendChild(groupsWrap);
 
@@ -450,7 +474,7 @@
   }
 
   /* ================= Group (collapsible) ================= */
-  function renderGroup(group, groupIdx, forceOpen) {
+  function renderGroup(group, groupIdx, forceOpen, sectionType) {
     const wordIds = group.words.map(function (w) { return w.wordId; });
     const wrap = h('div', { class: 'group' + (forceOpen ? ' open' : '') });
 
@@ -459,6 +483,7 @@
     const cb = customCheckbox({
       checked: UX.getGroupTriState(wordIds) === 'checked',
       extraClass: 'group-cb',
+      ariaLabel: 'Mark every word in this group as learned',
       onchange: function (checked) { UX.setGroupKnown(wordIds, checked); }
     });
     applyTriState(cb._input, UX.getGroupTriState(wordIds));
@@ -475,7 +500,7 @@
     ]);
 
     const body = h('div', { class: 'group-body' });
-    group.words.forEach(function (w) { body.appendChild(renderWord(w)); });
+    group.words.forEach(function (w) { body.appendChild(renderWord(w, sectionType)); });
 
     function toggleOpen() {
       const isOpen = wrap.classList.toggle('open');
@@ -504,6 +529,12 @@
        footer.word-card-foot  → [known state text] [manual-review flag]
      Presentation only: wordId, UX.isKnown / toggleKnown /
      isManualReview / toggleManualReview are used exactly as before. */
+  // "mix - combine - merge" (or "a / b", "a, b") → ["mix", "combine", "merge"].
+  // Each synonym / antonym becomes its own chip: easier to read and to tap.
+  function splitRelated(text) {
+    return String(text).split(/\s+[-\u2013\u2014]\s+|\s*[\/\u060C,;]\s*/).map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+
   function renderWordExtras(w) {
     const keys = Object.keys(w.extras || {}).filter(function (k) { return k !== '_raw' && w.extras[k]; });
     if (keys.length) {
@@ -524,8 +555,32 @@
     return null;
   }
 
-  function renderWord(w) {
-    const card = h('article', { class: 'word-card ' + (w.status === 'easy' ? 'is-easy' : 'is-hard'), 'data-word-id': w.wordId });
+  // Synonyms & Antonyms are studied, not just looked at, so they get their own
+  // roomier layout: two clearly separate groups, each with a plain-text title,
+  // a small icon (the icon is only a hint — the TITLE carries the meaning) and
+  // one large, tappable chip per word. Group styles differ by outline as well
+  // as by tone (solid vs dashed), so they never rely on color alone.
+  function renderRelatedGroups(w) {
+    const keys = Object.keys(w.extras || {}).filter(function (k) { return k !== '_raw' && w.extras[k]; });
+    const wrap = h('div', { class: 'related' });
+    keys.forEach(function (k) {
+      const isSyn = /syn/i.test(k);
+      const words = splitRelated(w.extras[k]);
+      if (!words.length) return;
+      const list = h('ul', { class: 'related-list' });
+      words.forEach(function (x) { list.appendChild(h('li', { class: 'related-chip', text: x })); });
+      wrap.appendChild(h('section', { class: 'related-group ' + (isSyn ? 'related-syn' : 'related-ant'), 'aria-label': isSyn ? 'Synonyms' : 'Antonyms' }, [
+        h('h3', { class: 'related-title' }, [icon(isSyn ? 'equal' : 'arrow-left-right', 'related-icon'), h('span', { text: isSyn ? 'Synonyms' : 'Antonyms' })]),
+        list
+      ]));
+    });
+    if (!wrap.children.length) return null;
+    return wrap;
+  }
+
+  function renderWord(w, sectionType) {
+    const study = sectionType === 'synonyms_antonyms';
+    const card = h('article', { class: 'word-card ' + (w.status === 'easy' ? 'is-easy' : 'is-hard') + (study ? ' word-card-study' : ''), 'data-word-id': w.wordId });
 
     const cb = customCheckbox({
       checked: UX.isKnown(w.wordId),
@@ -545,7 +600,7 @@
     card.appendChild(h('header', { class: 'word-card-head' }, [cb, identity, diff]));
     card.appendChild(h('p', { class: 'word-meaning', dir: 'auto', text: w.meaning }));
 
-    const extras = renderWordExtras(w);
+    const extras = study ? (renderRelatedGroups(w) || renderWordExtras(w)) : renderWordExtras(w);
     if (extras) card.appendChild(extras);
 
     const stateIcon = h('span', { class: 'word-state-icon' });
@@ -665,9 +720,22 @@
     }
   }
 
+  // Home: keep the unit bars in step with the learned state (no re-render).
+  function refreshUnitProgress() {
+    if (!unitProgressRefs) return;
+    Object.keys(unitProgressRefs).forEach(function (u) {
+      const r = unitProgressRefs[u], p = UX.getUnitProgress(Number(u));
+      r.fill.style.width = pct(p.progress);
+      r.pct.textContent = pctLabel(p.progress);
+      r.bar.setAttribute('aria-valuenow', String(Math.round(p.progress * 100)));
+    });
+  }
+
   // Statistics screen: patch just the numbers/lists that changed instead
   // of clearing and rebuilding the whole screen (keeps scroll position).
-  function pct(p) { return Math.round(p * 100) + '%'; }
+  function pct(p) { return Math.round(p * 100) + '%'; }   // used for bar WIDTHS
+  // Text label for a progress value: a little progress never reads as "0%".
+  function pctLabel(p) { return p > 0 && p < 0.01 ? '<1%' : Math.round(p * 100) + '%'; }
   function typeStat(stats, type) {
     return (stats.byType && stats.byType[type]) || { total: 0, known: 0, progress: 0 };
   }
@@ -675,13 +743,14 @@
     if (!statsRefs) return;
     const stats = UX.getStatistics();
     Object.keys(statsRefs.types).forEach(function (type) {
-      const t = typeStat(stats, type);
-      statsRefs.types[type].fill.style.width = pct(t.progress);
-      statsRefs.types[type].text.textContent = t.known + ' / ' + t.total + ' (' + pct(t.progress) + ')';
+      const t = typeStat(stats, type), r = statsRefs.types[type];
+      r.fill.style.width = pct(t.progress);
+      r.pct.textContent = pctLabel(t.progress);
+      r.count.textContent = t.known + ' / ' + t.total + ' words';
     });
     statsRefs.overallFill.style.width = pct(stats.overall.progress);
-    statsRefs.overallPct.textContent = pct(stats.overall.progress);
-    statsRefs.overallText.textContent = stats.overall.known + ' / ' + stats.overall.total;
+    statsRefs.overallPct.textContent = pctLabel(stats.overall.progress);
+    statsRefs.overallText.textContent = stats.overall.known + ' of ' + stats.overall.total + ' words learned';
     statsRefs.reviewHead.textContent = 'Words to review (' + stats.reviewWords.length + ')';
     renderReviewInto(statsRefs.reviewListEl, stats);
   }
@@ -698,51 +767,41 @@
 
     el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Statistics' })]));
 
-    const statsGrid = h('div', { class: 'stats-cards-grid' });
-
-    // One card per content type, in the order SECTION_META declares
-    // (Vocabulary, Synonyms & Antonyms, Idioms & Phrasal Verbs,
-    // Derivatives). Each type is counted on its own, so one never dilutes
-    // another.
-    const typeRefs = {};
-    Object.keys(SECTION_META).forEach(function (type) {
-      const t = typeStat(stats, type);
-      const card = h('div', { class: 'card stats-card stats-card-' + type + ' ' + sectionMeta(type).className });
-      const text = h('span', { class: 'stats-value', text: t.known + ' / ' + t.total + ' (' + pct(t.progress) + ')' });
-      card.appendChild(h('div', { class: 'stats-row' }, [
-        h('span', { class: 'text-muted', text: statLabel(type) }),
-        text
-      ]));
-      const bar = h('div', { class: 'progress-bar' });
-      const fill = h('div', { class: 'progress-fill' });
-      fill.style.width = pct(t.progress);
-      bar.appendChild(fill);
-      card.appendChild(bar);
-      statsGrid.appendChild(card);
-      typeRefs[type] = { fill: fill, text: text };
-    });
-
-    // Overall — every section type combined (unchanged from before).
-    const overallCard = h('div', { class: 'card stats-card stats-card-overall' });
-    const overallPct = h('span', { class: 'stats-value', text: pct(stats.overall.progress) });
-    overallCard.appendChild(h('div', { class: 'stats-row' }, [
-      h('span', { class: 'text-muted', text: 'Overall (all sections)' }),
-      overallPct
-    ]));
-    const overallBar = h('div', { class: 'progress-bar' });
+    // 1) Overall progress first: one big number, one bar.
+    const overallPct = h('span', { class: 'stats-hero-pct', text: pctLabel(stats.overall.progress) });
+    const overallText = h('span', { class: 'stats-hero-count', text: stats.overall.known + ' of ' + stats.overall.total + ' words learned' });
     const overallFill = h('div', { class: 'progress-fill' });
     overallFill.style.width = pct(stats.overall.progress);
-    overallBar.appendChild(overallFill);
-    overallCard.appendChild(overallBar);
-    const overallText = h('span', { class: 'stats-value', text: stats.overall.known + ' / ' + stats.overall.total });
-    overallCard.appendChild(h('div', { class: 'stats-row' }, [
-      h('span', { class: 'text-muted', text: 'Learned' }),
-      overallText
+    el.screen.appendChild(h('section', { class: 'card stats-hero tone-blue', 'aria-label': 'Overall progress' }, [
+      h('div', { class: 'stats-hero-label', text: 'Overall progress' }),
+      h('div', { class: 'stats-hero-main' }, [overallPct, overallText]),
+      h('div', { class: 'progress-bar progress-lg', role: 'progressbar', 'aria-label': 'Overall progress' }, [overallFill])
     ]));
-    statsGrid.appendChild(overallCard);
-    el.screen.appendChild(statsGrid);
 
-    const reviewHead = h('h2', { class: 'section-title-flat' }, [
+    // 2) Progress per content type, grouped in ONE card (rows, not four cards).
+    // Order follows SECTION_META; each type is counted on its own, so one
+    // never dilutes another.
+    el.screen.appendChild(h('h2', { class: 'stats-section-title', text: 'By content type' }));
+    const typeRefs = {};
+    const typesList = h('div', { class: 'card stats-types' });
+    Object.keys(SECTION_META).forEach(function (type) {
+      const t = typeStat(stats, type);
+      const meta = sectionMeta(type);
+      const fill = h('div', { class: 'progress-fill' });
+      fill.style.width = pct(t.progress);
+      const count = h('span', { class: 'stats-type-count', text: t.known + ' / ' + t.total + ' words' });
+      const pctEl = h('span', { class: 'stats-type-pct', text: pctLabel(t.progress) });
+      typesList.appendChild(h('div', { class: 'stats-type stats-card-' + type + ' ' + meta.className }, [
+        h('span', { class: 'stats-type-badge' }, [icon(meta.icon)]),
+        h('div', { class: 'stats-type-text' }, [h('span', { class: 'stats-type-label', text: statLabel(type) }), count]),
+        pctEl,
+        h('div', { class: 'progress-bar stats-type-bar', role: 'progressbar', 'aria-label': statLabel(type) + ' progress' }, [fill])
+      ]));
+      typeRefs[type] = { fill: fill, pct: pctEl, count: count };
+    });
+    el.screen.appendChild(typesList);
+
+    const reviewHead = h('h2', { class: 'stats-section-title stats-review-title' }, [
       icon('flag'), h('span', { text: 'Words to review (' + stats.reviewWords.length + ')' })
     ]);
     el.screen.appendChild(reviewHead);
@@ -762,111 +821,227 @@
 
   /* ================= Quiz ================= */
   const RESULT_ICONS = { correct: 'check', near: 'equal-approximately', wrong: 'x', skipped: 'minus' };
-  // Feedback after each answer. It confirms how the answer was judged but
-  // never prints the correct word — the exam stays "blind" until the end.
-  const FEEDBACK = {
-    correct: { text: 'Correct' },
-    near: { text: 'Almost \u2014 counted as half a point' },
-    wrong: { text: 'Not quite' },
-    skipped: { text: 'Skipped' }
-  };
-  const FEEDBACK_DELAY_MS = { correct: 450, near: 850, wrong: 850, skipped: 450 };
   let lastTimerState = 'normal';
+  let quizView = 'question';     // 'question' | 'summary' (the "ready to finish?" step)
+  let quizRefs = null;           // DOM handles of the running quiz, so live updates never rebuild the screen
+
+  // During a quiz the site chrome disappears: no bottom bar, no side rail, no
+  // floating theme button — the quiz owns the whole screen (see .quiz-fs).
+  function setQuizChrome(on) {
+    document.body.classList.toggle('quiz-active', on);
+    eachNav(function (n) { n.hidden = on; });
+  }
+
+  // A question's state is never colour-only: each state has its own marker
+  // (check / dash / empty) and outline style as well as its colour.
+  const QSTATE = {
+    answered: { icon: 'check', label: 'answered' },
+    skipped: { icon: 'minus', label: 'skipped' },
+    unanswered: { icon: null, label: 'not answered yet' }
+  };
+  function setMarker(host, state) {
+    clear(host);
+    if (QSTATE[state].icon) host.appendChild(icon(QSTATE[state].icon));
+  }
 
   function renderQuiz() {
     route = { screen: 'quiz' };
     clear(el.screen);
     const quiz = UX.getCurrentQuiz();
-    if (!quiz) { renderHome(); return; }
+    if (!quiz) { setQuizChrome(false); renderHome(); return; }
+    setQuizChrome(true);
+    quizView = 'question';
     lastTimerState = 'normal';
 
-    el.screen.appendChild(h('header', { class: 'quiz-top' }, [
+    const refs = quizRefs = { pills: [], rows: [] };
+    refs.title = h('div', { class: 'quiz-title', 'aria-live': 'polite' });
+    refs.sub = h('div', { class: 'quiz-sub' });
+    refs.timerText = h('span', { id: 'quiz-timer-text', text: QE.formatClock(quiz.timeLeft) });
+
+    const bar = h('header', { class: 'quiz-bar' }, [
       h('button', {
-        class: 'icon-btn quiz-close', 'aria-label': 'Cancel quiz',
-        onclick: function () { if (confirm('Cancel this quiz?')) { UX.abortQuiz(); renderHome(); } }
+        type: 'button', class: 'icon-btn quiz-close', 'aria-label': 'Cancel quiz',
+        onclick: function () { if (confirm('Cancel this quiz? Your answers will be discarded.')) { UX.abortQuiz(); renderHome(); } }
       }, [icon('x')]),
-      h('div', { class: 'quiz-progress' }, [
-        h('div', { class: 'quiz-progress-text' }, [
-          h('span', { class: 'quiz-progress-now', id: 'quiz-counter-now', text: '1' }),
-          h('span', { class: 'quiz-progress-total', text: ' / ' + quiz.total })
-        ]),
-        h('div', { class: 'quiz-progress-bar' }, [h('div', { class: 'quiz-progress-fill', id: 'quiz-progress-fill' })])
-      ]),
-      h('div', { class: 'quiz-timer', id: 'quiz-timer', role: 'timer', 'aria-label': 'Time left' }, [
-        icon('timer'), h('span', { id: 'quiz-timer-text', text: QE.formatClock(quiz.timeLeft) })
-      ])
-    ]));
-    el.screen.appendChild(h('div', { class: 'quiz-timebar', 'aria-hidden': 'true' }, [h('div', { class: 'quiz-timebar-fill', id: 'quiz-timebar-fill' })]));
-    el.screen.appendChild(h('div', { class: 'visually-hidden', id: 'quiz-announce', 'aria-live': 'polite' }));
-    el.screen.appendChild(h('div', { class: 'quiz-body', id: 'quiz-body' }));
+      h('div', { class: 'quiz-heading' }, [refs.title, refs.sub]),
+      h('div', { class: 'quiz-timer', id: 'quiz-timer', role: 'timer', 'aria-label': 'Time left' }, [icon('timer'), refs.timerText]),
+      h('button', { type: 'button', class: 'icon-btn quiz-review-btn', 'aria-label': 'Review answers and finish', title: 'Review and finish', onclick: openQuizSummary }, [icon('list-checks')])
+    ]);
+
+    // Mobile: a strip with one numbered button per question.
+    const strip = h('nav', { class: 'quiz-numbers', 'aria-label': 'Questions' });
+    quiz.items.forEach(function (it) {
+      const marker = h('span', { class: 'qn-marker', 'aria-hidden': 'true' });
+      const b = h('button', { type: 'button', class: 'qn', onclick: function () { quizGo(it.index); } }, [h('span', { class: 'qn-num', text: String(it.index + 1) }), marker]);
+      refs.pills.push({ el: b, marker: marker });
+      strip.appendChild(b);
+    });
+
+    // Desktop: a compact panel listing every question of this session.
+    const panelTitle = QE.PANEL && QE.PANEL.SHOW_ENGLISH_WORDS ? 'Quiz words' : 'Questions';
+    const list = h('ol', { class: 'qp-list' });
+    quiz.items.forEach(function (it) {
+      const marker = h('span', { class: 'qp-marker', 'aria-hidden': 'true' });
+      const b = h('button', { type: 'button', class: 'qp-row', onclick: function () { quizGo(it.index); } }, [
+        h('span', { class: 'qp-num', text: String(it.index + 1) }),
+        h('span', { class: 'qp-label', dir: 'auto', text: it.label }),
+        marker
+      ]);
+      refs.rows.push({ el: b, marker: marker });
+      list.appendChild(h('li', {}, [b]));
+    });
+    const panel = h('aside', { class: 'quiz-panel', 'aria-label': panelTitle }, [h('h2', { class: 'qp-title', text: panelTitle }), list]);
+
+    refs.stage = h('div', { class: 'quiz-stage-wrap' });
+    refs.main = h('div', { class: 'quiz-main' }, [refs.stage]);
+    const body = h('div', { class: 'quiz-body' }, [refs.main, panel]);
+
+    const fs = h('div', { class: 'quiz-fs', id: 'quiz-fs', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Quiz' }, [
+      bar, strip,
+      h('div', { class: 'quiz-timebar', 'aria-hidden': 'true' }, [h('div', { class: 'quiz-timebar-fill', id: 'quiz-timebar-fill' })]),
+      h('div', { class: 'visually-hidden', id: 'quiz-announce', 'aria-live': 'polite' }),
+      body
+    ]);
+    fs.addEventListener('keydown', function (e) {
+      if (!e.altKey) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); quizNext(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); quizPrev(); }
+    });
+    el.screen.appendChild(fs);
     updateQuizTimer({ timeLeft: quiz.timeLeft, timeLimit: quiz.timeLimit, state: quiz.timerState });
-    renderQuizQuestion();
-    showNav('home');
+    refreshQuizIndicators();
+    renderQuizStage(true);
   }
 
-  function renderQuizQuestion() {
-    const body = document.getElementById('quiz-body');
-    if (!body) return;
-    clear(body);
+  // Keeps the counter, the number buttons and the desktop panel in step with
+  // the session (cheap: only classes / markers change, nothing is rebuilt).
+  function refreshQuizIndicators() {
     const quiz = UX.getCurrentQuiz();
-    if (!quiz || !quiz.question) return;
-
-    const now = document.getElementById('quiz-counter-now');
-    const fill = document.getElementById('quiz-progress-fill');
-    if (now) now.textContent = String(quiz.index + 1);
-    if (fill) fill.style.width = Math.round((quiz.index / quiz.total) * 100) + '%';
-
-    body.appendChild(h('section', { class: 'card quiz-card quiz-enter' }, [
-      h('div', { class: 'quiz-card-label', text: 'Type the English word' }),
-      h('div', { class: 'quiz-meaning', dir: 'auto', text: quiz.question.meaning })
-    ]));
-
-    const input = h('input', {
-      type: 'text', class: 'quiz-input', dir: 'ltr', placeholder: 'Your answer',
-      autocomplete: 'off', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false',
-      enterkeyhint: 'done', 'aria-label': 'Your answer'
+    if (!quiz || !quizRefs) return;
+    quizRefs.title.textContent = quizView === 'summary' ? 'Review & finish' : 'Question ' + (quiz.index + 1) + ' of ' + quiz.total;
+    quizRefs.sub.textContent = quiz.answered + ' answered' + (quiz.skipped ? ' \u00B7 ' + quiz.skipped + ' skipped' : '');
+    quiz.items.forEach(function (it) {
+      const cur = quizView === 'question' && it.index === quiz.index;
+      const name = 'Question ' + (it.index + 1) + ', ' + QSTATE[it.state].label + (cur ? ', current question' : '');
+      [quizRefs.pills[it.index], quizRefs.rows[it.index]].forEach(function (r, k) {
+        const base = k === 0 ? 'qn' : 'qp-row';
+        r.el.className = base + ' ' + base + '-' + it.state + (cur ? ' ' + base + '-current' : '');
+        r.el.setAttribute('aria-label', name + (k === 1 ? ': ' + it.label : ''));
+        if (cur) r.el.setAttribute('aria-current', 'step'); else r.el.removeAttribute('aria-current');
+        setMarker(r.marker, it.state);
+      });
     });
-    const feedback = h('div', { class: 'quiz-feedback', id: 'quiz-feedback', role: 'status', 'aria-live': 'polite' });
-    body.appendChild(h('div', { class: 'quiz-answer' }, [input, feedback]));
-
-    const skipBtn = h('button', { type: 'button', class: 'btn btn-secondary quiz-btn quiz-btn-skip' }, [icon('skip-forward'), h('span', { text: 'Skip' })]);
-    const submitBtn = h('button', { type: 'button', class: 'btn btn-primary quiz-btn quiz-btn-submit' }, [icon('check'), h('span', { text: 'Submit' })]);
-    // Pressing a button must not pull focus off the field — on a phone that
-    // would close and reopen the keyboard on every question.
-    [skipBtn, submitBtn].forEach(function (b) { b.addEventListener('pointerdown', function (e) { e.preventDefault(); }); });
-    body.appendChild(h('div', { class: 'quiz-actions' }, [skipBtn, submitBtn]));
-
-    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); doSubmit(); } });
-    skipBtn.addEventListener('click', doSkip);
-    submitBtn.addEventListener('click', doSubmit);
-    setTimeout(function () { if (document.body.contains(input)) input.focus(); }, 30);
-
-    let locked = false;
-    function lock(result) {
-      locked = true;
-      input.readOnly = true; // readOnly (not disabled) keeps focus, so the keyboard stays open
-      submitBtn.disabled = true;
-      skipBtn.disabled = true;
-      input.classList.add('answered', 'answered-' + result);
-      feedback.className = 'quiz-feedback quiz-feedback-' + result + ' is-shown';
-      clear(feedback);
-      feedback.appendChild(icon(RESULT_ICONS[result]));
-      feedback.appendChild(h('span', { text: FEEDBACK[result].text }));
-      setTimeout(function () {
-        const next = UX.nextQuizQuestion();
-        if (next) renderQuizQuestion();
-      }, FEEDBACK_DELAY_MS[result]);
+    if (quizView === 'question') {
+      [quizRefs.pills[quiz.index], quizRefs.rows[quiz.index]].forEach(function (r) {
+        if (r && r.el.scrollIntoView) r.el.scrollIntoView({ block: 'nearest', inline: 'center' });
+      });
     }
-    function doSubmit() {
-      if (locked) return;
-      const result = UX.submitQuizAnswer(input.value);
-      if (result) lock(result);
+  }
+
+  function quizGo(i) {
+    const quiz = UX.getCurrentQuiz();
+    if (!quiz) return;
+    const wasSummary = quizView === 'summary';
+    quizView = 'question';
+    if (i === quiz.index || wasSummary) { UX.goToQuestion(i); renderQuizStage(true); refreshQuizIndicators(); }
+    else UX.goToQuestion(i);          // 'quiz-question' event redraws
+  }
+  function quizNext() {
+    const quiz = UX.getCurrentQuiz();
+    if (!quiz) return;
+    if (quiz.index >= quiz.total - 1) openQuizSummary(); else UX.nextQuizQuestion();
+  }
+  function quizPrev() { UX.previousQuizQuestion(); }
+  function openQuizSummary() {
+    if (!UX.getCurrentQuiz()) return;
+    UX.leaveCurrentQuestion();          // an empty question you leave is skipped, like any other move
+    quizView = 'summary';
+    renderQuizStage(false);
+    refreshQuizIndicators();
+  }
+
+  function renderQuizStage(focusInput) {
+    if (!quizRefs) return;
+    const quiz = UX.getCurrentQuiz();
+    if (!quiz) return;
+    clear(quizRefs.stage);
+    if (quizView === 'summary') { quizRefs.stage.appendChild(renderQuizSummary(quiz)); return; }
+
+    const q = quiz.question;
+    const input = h('input', {
+      type: 'text', class: 'quiz-input', id: 'quiz-answer', dir: 'ltr', placeholder: 'Your answer', value: q.answer || '',
+      autocomplete: 'off', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'next',
+      'aria-label': 'Your answer for question ' + (quiz.index + 1)
+    });
+    input.value = q.answer || '';
+    const stateLine = h('div', { class: 'quiz-state-line', role: 'status' });
+    function paintState(state) {
+      clear(stateLine);
+      stateLine.className = 'quiz-state-line quiz-state-' + state;
+      const text = state === 'answered' ? 'Answer saved \u2014 you can change it any time'
+        : state === 'skipped' ? 'Skipped \u2014 you can still answer it'
+        : 'Not answered yet';
+      if (QSTATE[state].icon) stateLine.appendChild(icon(QSTATE[state].icon));
+      stateLine.appendChild(h('span', { text: text }));
     }
-    function doSkip() {
-      if (locked) return;
-      const result = UX.skipQuizQuestion();
-      if (result) lock(result);
+    paintState(q.state);
+    input.addEventListener('input', function () { paintState(UX.setQuizAnswer(input.value) || 'unanswered'); });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); quizNext(); } });
+
+    const last = quiz.index >= quiz.total - 1;
+    const prevBtn = h('button', { type: 'button', class: 'btn btn-secondary quiz-nav-btn', 'aria-label': 'Previous question', onclick: quizPrev }, [icon('arrow-left'), h('span', { text: 'Previous' })]);
+    prevBtn.disabled = quiz.index === 0;
+    const nextBtn = h('button', { type: 'button', class: 'btn btn-primary quiz-nav-btn', 'aria-label': last ? 'Review answers and finish' : 'Next question', onclick: quizNext }, [
+      h('span', { text: last ? 'Review & finish' : 'Next' }), icon(last ? 'list-checks' : 'arrow-right')
+    ]);
+
+    quizRefs.stage.appendChild(h('section', { class: 'quiz-stage' }, [
+      h('div', { class: 'card quiz-card quiz-enter' }, [
+        h('div', { class: 'quiz-card-label', text: 'Type the English word' }),
+        h('div', { class: 'quiz-meaning', dir: 'auto', text: q.meaning })
+      ]),
+      h('div', { class: 'quiz-answer' }, [input, stateLine]),
+      h('div', { class: 'quiz-foot' }, [prevBtn, nextBtn])
+    ]));
+    if (focusInput) setTimeout(function () { if (document.body.contains(input)) input.focus(); }, 30);
+  }
+
+  // The "ready to finish?" step: how many questions have an answer, and a way
+  // back to every one that does not. Grading only happens after "Finish quiz".
+  function renderQuizSummary(quiz) {
+    const tile = function (kind, n, label) {
+      return h('div', { class: 'qs-tile qs-' + kind }, [
+        h('span', { class: 'qs-icon' }, [icon(QSTATE[kind].icon || 'circle-dashed')]),
+        h('span', { class: 'qs-label', text: label }),
+        h('span', { class: 'qs-value', text: String(n) })
+      ]);
+    };
+    const children = [
+      h('h2', { class: 'qs-heading', text: 'Ready to finish?' }),
+      h('div', { class: 'qs-tiles' }, [
+        tile('answered', quiz.answered, 'Answered'), tile('skipped', quiz.skipped, 'Skipped'), tile('unanswered', quiz.unanswered, 'Unanswered')
+      ])
+    ];
+    if (quiz.unresolved.length) {
+      const chips = h('div', { class: 'qs-chips', role: 'group', 'aria-label': 'Questions without an answer' });
+      quiz.unresolved.forEach(function (i) {
+        const st = quiz.items[i].state;
+        chips.appendChild(h('button', { type: 'button', class: 'qn qn-' + st, 'aria-label': 'Go to question ' + (i + 1) + ', ' + QSTATE[st].label, onclick: function () { quizGo(i); } }, [
+          h('span', { class: 'qn-num', text: String(i + 1) }), h('span', { class: 'qn-marker', 'aria-hidden': 'true' }, QSTATE[st].icon ? [icon(QSTATE[st].icon)] : [])
+        ]));
+      });
+      children.push(h('div', { class: 'callout' }, [
+        h('p', { class: 'callout-text', text: plural(quiz.unresolved.length, 'question has', 'questions have') + ' no answer yet. Tap a number to go back to it. If you finish now, they count as skipped.' }),
+        chips
+      ]));
+    } else {
+      children.push(h('div', { class: 'callout callout-ok' }, [h('p', { class: 'callout-text', text: 'Every question has an answer.' })]));
     }
+    children.push(h('div', { class: 'qs-actions' }, [
+      h('button', { type: 'button', class: 'btn btn-secondary quiz-nav-btn', onclick: function () { quizGo(Math.min(quiz.index, quiz.total - 1)); } }, [icon('arrow-left'), h('span', { text: 'Back to questions' })]),
+      h('button', { type: 'button', class: 'btn btn-primary quiz-nav-btn', onclick: function () { UX.finishQuiz(false); } }, [icon('circle-check'), h('span', { text: 'Finish quiz' })])
+    ]));
+    return h('section', { class: 'quiz-stage quiz-summary' }, children);
   }
 
   // Near-expiry: the clock and the thin time bar change color as the limit
@@ -1125,7 +1300,96 @@
   }
 
   /* ================= Info =================
-     Part-of-speech reference + a small footer credit. */
+     Part-of-speech reference + the owner's study method + a small footer credit. */
+
+  /* ---------- Study method ----------
+     The text below is the OWNER'S OWN wording, in his own Egyptian-Arabic
+     style. It is shown word for word — never rewritten, shortened or
+     "formalised". Only its presentation is organised: paragraphs, transition
+     lines, example lines, and highlighted phrases. The markup tokens wrap
+     phrases that are already in the text (they add no words):
+       {y|…} {g|…} {v|…} {p|…}  highlighter chips: yellow / green / purple / pink.
+                                The colors are only for the eye — a color never
+                                carries a meaning by itself (see the note in the
+                                legend: don't reuse a color for different ideas).
+       {pb|…} {pr|…} {pk|…}      the PEN colors named in the text (blue / red / black):
+                                coloured ink on the word, no highlighter background,
+                                so pens and highlighters can't be confused.
+       {s1|…} {s2|…}            the two parts of a split word (two different chips)
+     Block kinds: lead (intro) · p (paragraph) · t (transition line) ·
+     ex / exen (example sentence, Arabic / English) · aside (side remark). */
+  const STUDY_METHOD = [
+    { k: 'lead', x: 'دي بعض طرق المذاكرة و الي حابب يجربها اهي قدامه' },
+    { k: 'p', x: 'هات ورقة و أقلام ({pr|أحمر} - {pk|أسود} - {pb|أزرق}) لي بقى الكلمة السهلة و دي هتحفظها باللون {pb|الأزرق} عادي هتكتب {y|3 كلمات عربي} و تبدأ تقرأ النطق و تكتب اول ما توصل للصعبة أكتبها باللون {pr|الأحمر} علشان تكون مميزة' },
+    { k: 'p', x: 'و بعديها اكتبها جنبها او تحتها مرتين بـ شكل مقاطع كل مقطع لوحده زي مثلا كلمة (Individuals) هتكتب {s1|indivi} بلون و {s2|duals} بلون مختلف جمب بعض و كررها مرتين مثلا' },
+    { k: 'p', x: 'و بعديها احفظ {v|3 مجاميع او 4 مجاميع} بالشكل ده بس بعد ما تحفظ ريح عقلك {v|5 دقايق} مش اكتر ولا أقل من كدة' },
+    { k: 'p', x: 'و بعديها تجيب بعدها {p|ورقة فاضية} و تبدأ تكتب العربي كله مرة واحدة مثلا هيكونوا 18 كلمة او 24 ع حسب عدد المجاميع الي حفظتها و تبدأ بقى {g|تسمع ل نفسك} طبيعي اول مرة هتنسى نطق كلمة او اتنين و م هتعرف تكتب بعد ما تصحح {g|تسمع تاني} و تخبي الي سمعته القديم و اختبر نفسك تاني' },
+    { k: 'p', x: 'و بعد ما تسمع لو لقيت كلمات غلط علم عليها ب قلم {p|Highlight} يكون واضح قدامك و علم برضو ع الكلمة من {p|زر الـمراجعة} الي تحت كل كلمة و ابدأ احفظ 3 او 4 مجاميع تاني و سمعهم لوحدهم برضو و لما تخلص تسميع و تعلم ع الي غلطت فيه بنفس الطريقة {g|تدخل كويز} ع المجاميع الي حفظتها كلها' },
+    { k: 'p', x: 'بس قبل الكويز تعمل {g|مراجعة سريعة نطق} للكلمة و اختبر نفسك و امشي هكذا ع الطريقة دي' },
+    { k: 't', x: 'طب لو لقيت نفسك ف بعض الكلمات بتنسى المعنى؟ تعمل اي ؟..' },
+    { k: 'p', x: 'تبدأ تجيب الكلمة دي و تحطها فـ جملة بالعربي الاول زي مثلا:' },
+    { k: 'ex', x: '(أنا ابدأ بلعب الكرة)' },
+    { k: 'p', x: 'فـ هتكتبها:' },
+    { k: 'exen', x: "(I'm kick off playing ball)" },
+    { k: 'aside', x: 'هو مجرد مثال حتى لو غلط بفهمكم بس 🙄' },
+    { k: 'p', x: 'و بعديها تختبر نفسك اختبار صغير تاني من الموقع بـ كويز ع الكلمات الي حددتها' },
+    { k: 'p', x: 'و {v|قسم الحفظ على 4 أيام} و لو حفظت فـ اقل من 4 ايام هيكون احسن بكتير جدا' },
+    { k: 't', x: 'يعني طب نراجع ازاي؟...' },
+    { k: 'p', x: 'هنبدأ نجيب الكلمة {y|نخبي العربي} و نقرأ انجليزي و نشوف افتكرتها بالعربي ولا لأ' },
+    { k: 'p', x: 'و بعد ما تخلص اعكس {y|خبي الانجليزي} و شوف هتفتكرها ولا لأ' },
+    { k: 'p', x: 'لو افتكرتها و نطقت صح تبقى تمام' },
+    { k: 't', x: 'طب لو مش فاكرها؟..' },
+    { k: 'p', x: '{y|حطها فـ جملة عربي و انجليزي} برضو فـ الكراسة و اعمل عليها {p|Highlight} برضو بس لون مختلف و ابدأ {y|قسمها لـ مقاطع} و اقرأها علطول' },
+    { k: 'p', x: 'و بس كدة يعني دي افضل طريقة ممكن تحفظ بيها الكلمات' },
+    { k: 'p', x: 'و طبعا كل شخص بيختلف عن التاني ف الطريقة فـ م مجبر تحفظ بنفس الطريقة لو عندك طريقة بتريحك فـ الحفظ اعملها المهم ان احنا رتبنا ليك الكلمات و سهلناها عليك بشكل كبير جدا عن الأول..' }
+  ];
+  // The owner's note under the legend — his own words, kept exactly.
+  const HL_NOTE = 'لا تستخدم نفس أو ألوانًا متشابهة بشكل متكرر لمفاهيم مختلفة، لأن ذلك قد يجعل العقل يخلط بينها. مثال: إذا كنت تستخدم القلم الأحمر للكلمات الصعبة، فمن الأفضل ألا تستخدم Highlighter أحمر لنفس الكلمات. استخدم مثلًا الأصفر أو الأخضر أو البنفسجي بدلًا منه.';
+  const HL_CLASS = { y: 'hl hl-yellow', g: 'hl hl-green', v: 'hl hl-purple', p: 'hl hl-pink', pb: 'pen pen-blue', pr: 'pen pen-red', pk: 'pen pen-black', s1: 'hl hl-yellow hl-syl', s2: 'hl hl-purple hl-syl' };
+
+  // Adds `text` to `parent`, turning {tag|phrase} tokens into highlight chips.
+  function appendRich(parent, text) {
+    const re = /\{(y|g|v|p|pb|pr|pk|s1|s2)\|([^}]*)\}/g;
+    let last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const chip = h('span', { class: HL_CLASS[m[1]], text: m[2] });
+      if (m[1] === 's1' || m[1] === 's2') chip.setAttribute('dir', 'ltr'); // a Latin syllable inside the Arabic line
+      parent.appendChild(chip);
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
+    return parent;
+  }
+
+  function renderStudyMethod() {
+    const body = h('div', { class: 'study-text', dir: 'rtl', lang: 'ar' });
+    STUDY_METHOD.forEach(function (b) {
+      if (b.k === 'lead') body.appendChild(appendRich(h('p', { class: 'study-lead' }), b.x));
+      else if (b.k === 't') body.appendChild(appendRich(h('p', { class: 'study-transition' }), b.x));
+      else if (b.k === 'ex') body.appendChild(appendRich(h('p', { class: 'study-example' }), b.x));
+      else if (b.k === 'exen') body.appendChild(appendRich(h('p', { class: 'study-example study-example-en', dir: 'ltr', lang: 'en' }), b.x));
+      else if (b.k === 'aside') body.appendChild(appendRich(h('p', { class: 'study-aside' }), b.x));
+      else body.appendChild(appendRich(h('p', { class: 'study-p' }), b.x));
+    });
+    // Legend: what a highlighter chip looks like on paper — small rounded
+    // rectangles (not dots), four colors, no meanings attached to them.
+    const swatches = h('ul', { class: 'hl-legend-list' });
+    [['yellow', 'Yellow'], ['green', 'Green'], ['purple', 'Purple'], ['pink', 'Pink']].forEach(function (c) {
+      swatches.appendChild(h('li', {}, [h('span', { class: 'hl hl-' + c[0] + ' hl-swatch', text: c[1] })]));
+    });
+    const legend = h('div', { class: 'hl-legend' }, [
+      h('h3', { class: 'hl-legend-title', text: 'Highlighter colors' }),
+      swatches,
+      h('p', { class: 'hl-note', dir: 'rtl', lang: 'ar', text: HL_NOTE })
+    ]);
+    return h('section', { class: 'card info-card study-card', 'aria-label': 'Study method' }, [
+      h('h2', { class: 'info-card-title', text: 'Study method' }),
+      body,
+      legend
+    ]);
+  }
+
   function renderInfo() {
     route = { screen: 'info' };
     clear(el.screen);
@@ -1150,11 +1414,12 @@
     });
     card.appendChild(list);
     card.appendChild(h('p', { class: 'text-muted pos-note', text: 'Some words have two tags separated by a slash, such as n./v. That means the word can work as either one.' }));
-    page.appendChild(card);
+    page.appendChild(renderStudyMethod());   // 1) Study Method
+    page.appendChild(card);                  // 2) Parts of Speech
 
     page.appendChild(h('footer', { class: 'info-footer' }, [
       h('p', { class: 'info-credit', text: 'Created by Mouhammed & Anas' }),
-      h('p', { class: 'info-copyright', text: '\u00A9 2026 E.English. All rights reserved.' })
+      h('p', { class: 'info-copyright', text: '\u00A9 2026 e.english. All rights reserved.' })
     ]));
     el.screen.appendChild(page);
     showNav('info');
@@ -1190,6 +1455,8 @@
     UX.on('theme-preference-changed', syncThemeButton);
     UX.on('theme-changed', applyTheme);
     UX.on('theme-color-changed', applyThemeColor);
+    applyFontMode(UX.getFontMode());
+    UX.on('font-mode-changed', applyFontMode);
 
     UX.on('content-ready', renderHome);
     UX.on('content-load-blocked', renderLoadBlocked);
@@ -1200,11 +1467,13 @@
     UX.on('state-changed', function () {
       if (route.screen === 'lesson') refreshWordStates();
       else if (route.screen === 'statistics') refreshStatsLive();
+      else if (route.screen === 'home') refreshUnitProgress();
     });
     // Import / delete-all replace the whole learning state: redraw whatever
     // screen is open from the new state (Settings redraws itself).
     function rerenderCurrent() {
-      if (route.screen === 'lesson') renderLesson(route.unit, route.lessonKey);
+      if (route.screen === 'home') renderHome();
+      else if (route.screen === 'lesson') renderLesson(route.unit, route.lessonKey);
       else if (route.screen === 'statistics') renderStatistics();
       else if (route.screen === 'history') renderHistory();
       else if (route.screen === 'unit') renderUnit(route.unit);
@@ -1213,17 +1482,23 @@
     UX.on('data-reset', rerenderCurrent);
 
     UX.on('quiz-tick', updateQuizTimer);
+    UX.on('quiz-question', function () { if (route.screen === 'quiz') { renderQuizStage(true); refreshQuizIndicators(); } });
+    UX.on('quiz-overview', function () { if (route.screen === 'quiz') refreshQuizIndicators(); });
     UX.on('quiz-finished', renderQuizFinished);
     UX.on('search-results', renderSearchResults);
 
     renderSkeleton();
     UX.loadAll();
+    // Notice a different model version on the server (newer OR older) and
+    // refresh onto it, with the refreshTimes anti-loop guard (see ux.js).
+    UX.startUpdateWatcher();
   }
 
   global.UI = {
     init: init,
     renderHome: renderHome,
     renderInfo: renderInfo,
+    studyMethod: STUDY_METHOD,
     posCategory: posCategory,
     posInfo: POS_INFO,
     renderUnit: renderUnit,

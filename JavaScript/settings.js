@@ -89,7 +89,7 @@
   /* ---------------- Small reusable row builders ---------------- */
   function settingsRow(iconName, title, sub, control, tone) {
     return h('div', { class: 'settings-row' }, [
-      h('span', { class: 'settings-row-icon ' + (tone || 'tone-slate') }, [icon(iconName)]),
+      h('span', { class: 'settings-row-icon ' + (tone || 'tone-blue') }, [icon(iconName)]),
       h('div', { class: 'settings-row-text' }, [
         h('div', { class: 'settings-row-title', text: title }),
         sub ? h('div', { class: 'settings-row-sub', text: sub }) : null
@@ -122,8 +122,8 @@
     return wrap;
   }
 
-  function toggleSwitch(checked, onChange) {
-    const input = h('input', { type: 'checkbox', class: 'switch-input visually-hidden' });
+  function toggleSwitch(checked, onChange, label) {
+    const input = h('input', { type: 'checkbox', class: 'switch-input visually-hidden', role: 'switch', 'aria-label': label || 'Toggle' });
     input.checked = !!checked;
     input.addEventListener('change', function () { onChange(input.checked); });
     return h('label', { class: 'switch' }, [input, h('span', { class: 'switch-track' })]);
@@ -145,7 +145,7 @@
     const appearanceCard = h('div', { class: 'card settings-card' });
 
     const themeRow = h('div', { class: 'settings-row settings-row-block' }, [
-      h('span', { class: 'settings-row-icon tone-violet' }, [icon('sun-moon')]),
+      h('span', { class: 'settings-row-icon tone-blue' }, [icon('sun-moon')]),
       h('div', { class: 'settings-row-text' }, [
         h('div', { class: 'settings-row-title', text: 'Theme mode' }),
         h('div', { class: 'settings-row-sub', text: 'Light, dark, or follow your device' })
@@ -167,11 +167,39 @@
     themeSeg.setAttribute('aria-label', 'Theme mode');
     appearanceCard.appendChild(h('div', { class: 'settings-seg-wrap' }, [themeSeg]));
 
+    /* ---- Font style: O2 (default) / Regular / Bold ----
+       One preference (UX.getFontMode). ui.js turns it into <html data-font>,
+       and root.css maps that to the two weight roles the whole app uses. */
+    appearanceCard.appendChild(h('div', { class: 'settings-row settings-row-block settings-row-flush' }, [
+      h('span', { class: 'settings-row-icon tone-blue' }, [icon('type')]),
+      h('div', { class: 'settings-row-text' }, [
+        h('div', { class: 'settings-row-title', text: 'Font style' })
+      ])
+    ]));
+    const fontSeg = segmented(
+      [
+        { value: 'o2', label: 'O2' },
+        { value: 'regular', label: 'Regular' },
+        { value: 'bold', label: 'Bold' }
+      ],
+      UX.getFontMode(),
+      function (val) { UX.setFontMode(val); }
+    );
+    fontSeg.classList.add('segmented-full', 'segmented-font');
+    fontSeg.setAttribute('role', 'group');
+    fontSeg.setAttribute('aria-label', 'Font style');
+    const fontHelp = h('ul', { class: 'font-help' }, [
+      h('li', {}, [h('strong', { text: 'O2' }), h('span', { class: 'font-help-tag', text: 'Recommended' }), ' \u2014 Bold headings, Regular text.']),
+      h('li', {}, [h('strong', { text: 'Regular' }), ' \u2014 All text Regular.']),
+      h('li', {}, [h('strong', { text: 'Bold' }), ' \u2014 All text Bold.'])
+    ]);
+    appearanceCard.appendChild(h('div', { class: 'settings-seg-wrap' }, [fontSeg, fontHelp]));
+
     const colorRow = h('div', { class: 'settings-row settings-row-block' }, [
-      h('span', { class: 'settings-row-icon tone-rose' }, [icon('swatch-book')]),
+      h('span', { class: 'settings-row-icon tone-blue' }, [icon('swatch-book')]),
       h('div', { class: 'settings-row-text' }, [
         h('div', { class: 'settings-row-title', text: 'Accent color' }),
-        h('div', { class: 'settings-row-sub', text: 'Default keeps the app multi-colored. Pick a palette to use one accent everywhere.' })
+        h('div', { class: 'settings-row-sub', text: 'Default is a calm blue. Pick a palette to use one accent everywhere.' })
       ])
     ]);
     colorRow.classList.add('settings-row-flush');
@@ -197,9 +225,9 @@
       return b;
     }
     // "Default" is not one of the 8 palettes: it is the way back to the
-    // multi-colored look with no forced accent.
+    // calm default look with no accent picked.
     colorPicker.appendChild(h('div', { class: 'theme-color-group theme-color-default' }, [
-      swatchButton('default', 'Default · multi-color', 'swatch-default')
+      swatchButton('default', 'Default', 'swatch-default')
     ]));
     COLOR_GROUPS.forEach(function (g) {
       const grid = h('div', { class: 'theme-color-grid' });
@@ -224,7 +252,8 @@
           releaseWakeLock();
         }
       }
-    ), 'tone-amber'));
+      , 'Keep screen awake'
+    ), 'tone-blue'));
     screen.appendChild(appearanceCard);
 
     /* ---- Advanced (collapsed by default) ---- */
@@ -262,7 +291,7 @@
       }
     }, [icon('download'), h('span', { text: 'Export Data' })]));
 
-    const importInput = h('input', { type: 'file', accept: 'application/json', class: 'visually-hidden' });
+    const importInput = h('input', { type: 'file', accept: 'application/json', class: 'visually-hidden', 'aria-label': 'Choose a backup file to import', tabindex: '-1' });
     importInput.addEventListener('change', function () {
       const file = importInput.files && importInput.files[0];
       if (!file) return;
@@ -277,7 +306,7 @@
           showToast('Data imported successfully', 'ok');
           render({ keepAdvanced: true });
         } else {
-          showToast('This file is not a valid E.English backup', 'warn');
+          showToast('This file is not a valid e.english backup', 'warn');
         }
       };
       reader.readAsText(file);
@@ -363,6 +392,16 @@
   UX.on('theme-preference-changed', function (pref) {
     document.querySelectorAll('.segmented-theme .segmented-btn').forEach(function (b) {
       const on = b.dataset.value === pref;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  });
+
+  // Same idea for the font style: the selector only reflects the one preference
+  // (it can also change through an import).
+  UX.on('font-mode-changed', function (mode) {
+    document.querySelectorAll('.segmented-font .segmented-btn').forEach(function (b) {
+      const on = b.dataset.value === mode;
       b.classList.toggle('active', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });

@@ -1,9 +1,11 @@
 /* quiz-engine.js — all quiz-specific LOGIC, with no side effects.
 
    What lives here:  question selection · quiz modes · question generation ·
-   dynamic duration (estimate / range / time limit) · timer maths · answer
-   normalisation · exact / near-miss / wrong / skipped classification ·
-   scoring · category counts · result records (and upgrading old ones).
+   the QUIZ SESSION (a fixed question order, an answer per question, and the
+   unanswered / answered / skipped state of each) · dynamic duration (estimate /
+   range / time limit) · timer maths · answer normalisation · grading
+   (exact / near-miss / wrong / skipped) · scoring · category counts · result
+   records (and upgrading old ones).
 
    What does NOT live here (it stays in ux.js): application state,
    localStorage, the event bus, navigation, saving history, and changing the
@@ -87,6 +89,21 @@
   };
 
   const RECORD_VERSION = 2;
+
+  // The state of a question DURING the quiz. It only says whether the learner
+  // wrote something — never whether it is right. Correct / near / wrong exist
+  // only after grading (grade() below), when the learner finishes.
+  //   unanswered  not visited yet, or visited and still empty
+  //   answered    the learner has typed something (right or wrong: unknown)
+  //   skipped     the learner left the question with nothing written
+  const QUESTION_STATES = ['unanswered', 'answered', 'skipped'];
+
+  // What the compact "Quiz Words" panel (desktop) lists for each question.
+  // The quiz asks for the ENGLISH word from its meaning, so listing the
+  // English words in question order would hand over every answer. By default
+  // the panel therefore lists the question prompt (the meaning). Set this to
+  // true only if the panel really should show the English words.
+  const PANEL = { SHOW_ENGLISH_WORDS: false };
 
   /* =====================================================================
      Answer normalisation + classification
@@ -271,10 +288,11 @@
   }
 
   // Turns content words into quiz questions. `word` is the expected answer,
-  // `meaning` is the prompt shown to the learner.
+  // `meaning` is the prompt shown to the learner, `answer` is what the learner
+  // has typed so far and `state` is unanswered | answered | skipped.
   function buildQuestions(words) {
     return words.map(function (w, i) {
-      return { qid: 'q' + (i + 1), wordId: w.wordId, word: w.word, meaning: w.meaning, pos: w.pos || null };
+      return { id: 'q' + (i + 1), wordId: w.wordId, word: w.word, meaning: w.meaning, pos: w.pos || null, answer: '', state: 'unanswered' };
     });
   }
 
@@ -286,7 +304,10 @@
   }
 
   /* =====================================================================
-     Session (plain data) — ux.js owns it, the functions below advance it
+     Session (plain data) — ux.js owns it, the functions below change it.
+     The question ORDER is fixed when the session is created: random
+     selection happens once (selectQuestions), and moving between questions
+     never shuffles anything.
      ===================================================================== */
 
   function createSession(opts) {
@@ -298,58 +319,85 @@
       startedAt: opts.now,
       questions: questions,
       index: 0,
-      answers: [],
       estimate: estimateDuration(questions)
     };
   }
 
-  function currentQuestion(session) {
-    return session.questions[session.index] || null;
+  function currentQuestion(session) { return session.questions[session.index] || null; }
+  function hasText(answer) { return normalizeAnswer(answer) !== ''; }
+
+  // Stores what the learner typed for question `i`. Typing marks it answered;
+  // clearing the box takes it back to unanswered (it becomes skipped only
+  // when the learner leaves the question empty). Returns false for a bad index.
+  function setAnswer(session, i, text) {
+    const q = session.questions[i];
+    if (!q) return false;
+    q.answer = String(text == null ? '' : text);
+    if (hasText(q.answer)) q.state = 'answered';
+    else if (q.state === 'answered') q.state = 'unanswered';
+    return true;
   }
-  function isAnswered(session) { return session.answers.length > session.index; }
+
+  // Called when the learner moves AWAY from question `i`: an empty question
+  // becomes skipped (automatically — there is no Skip button). A question that
+  // has text stays answered. Returns true if the state changed.
+  function leaveQuestion(session, i) {
+    const q = session.questions[i];
+    if (!q) return false;
+    if (!hasText(q.answer) && q.state !== 'skipped') { q.state = 'skipped'; return true; }
+    return false;
+  }
+
+  // Moves to question `target` (clamped to the quiz). Nothing is erased: the
+  // answers of the question left and of the one reached are kept exactly.
+  // Returns { moved, index, changedState }.
+  function goTo(session, target) {
+    const n = session.questions.length;
+    const t = Math.max(0, Math.min(n - 1, Math.floor(Number(target) || 0)));
+    if (t === session.index) return { moved: false, index: t, changedState: false };
+    const changed = leaveQuestion(session, session.index);
+    session.index = t;
+    return { moved: true, index: t, changedState: changed };
+  }
+
+  // Counts for the completion summary + the number indicator.
+  function overview(session) {
+    const counts = { answered: 0, skipped: 0, unanswered: 0 };
+    const items = session.questions.map(function (q, i) {
+      counts[q.state]++;
+      return { id: q.id, index: i, state: q.state };
+    });
+    return {
+      total: session.questions.length, answered: counts.answered, skipped: counts.skipped, unanswered: counts.unanswered,
+      unresolved: items.filter(function (it) { return it.state !== 'answered'; }).map(function (it) { return it.index; }),
+      items: items
+    };
+  }
+
+  // The text the desktop "Quiz Words" panel shows for a question (see PANEL).
+  function panelLabel(question) { return PANEL.SHOW_ENGLISH_WORDS ? question.word : question.meaning; }
 
   // Immutable per-question snapshot: it carries everything needed to show
   // this answer later, even if the lesson content has changed since.
   function snapshot(question, userAnswer, verdict) {
     return {
-      qid: question.qid, wordId: question.wordId,
+      qid: question.id, wordId: question.wordId,
       prompt: question.meaning, expected: question.word,
       userAnswer: String(userAnswer == null ? '' : userAnswer),
       result: verdict.result, score: verdict.score
     };
   }
 
-  // Records the answer for the current question. Returns the snapshot, or
-  // null if there is no current question / it was already answered.
-  function answerCurrent(session, userAnswer) {
-    const q = currentQuestion(session);
-    if (!q || isAnswered(session)) return null;
-    const entry = snapshot(q, userAnswer, classifyAnswer(userAnswer, q.word));
-    session.answers.push(entry);
-    return entry;
-  }
-  function skipCurrent(session) {
-    const q = currentQuestion(session);
-    if (!q || isAnswered(session)) return null;
-    const entry = snapshot(q, '', { result: 'skipped', score: SCORING.skipped });
-    session.answers.push(entry);
-    return entry;
-  }
-  // Moves to the next question; false when the quiz has no more.
-  function advance(session) {
-    session.index++;
-    return session.index < session.questions.length;
-  }
-  // Time ran out (or the quiz ended early): every question without an answer
-  // becomes skipped. Returns just the entries it added.
-  function expireRemaining(session) {
-    const added = [];
-    for (let i = session.answers.length; i < session.questions.length; i++) {
-      const entry = snapshot(session.questions[i], '', { result: 'skipped', score: SCORING.skipped });
-      session.answers.push(entry);
-      added.push(entry);
-    }
-    return added;
+  // GRADING — the only place a question becomes correct / near / wrong.
+  // Something typed → classified against the expected word. Nothing typed
+  // (unanswered or skipped) → skipped. Does not change the session.
+  function grade(session) {
+    return session.questions.map(function (q) {
+      const verdict = hasText(q.answer)
+        ? classifyAnswer(q.answer, q.word)
+        : { result: 'skipped', score: SCORING.skipped };
+      return snapshot(q, hasText(q.answer) ? q.answer : '', verdict);
+    });
   }
 
   /* =====================================================================
@@ -380,7 +428,8 @@
   // text, expected answer, user answer, category and points for every
   // question, so it never needs the lesson files again.
   function buildRecord(session, opts) {
-    const s = summarize(session.answers, session.questions.length);
+    const graded = grade(session);
+    const s = summarize(graded, session.questions.length);
     const durationSeconds = Math.max(0, Math.min(
       Math.round((opts.now - session.startedAt) / 1000),
       session.estimate.timeLimit
@@ -400,7 +449,7 @@
       estimatedRange: { min: session.estimate.estimatedRange.min, max: session.estimate.estimatedRange.max },
       timeLimit: session.estimate.timeLimit,
       timedOut: !!opts.timedOut,
-      answers: session.answers.map(function (a) { return Object.assign({}, a); })
+      answers: graded
     };
   }
 
@@ -491,7 +540,7 @@
     // constants (read-only by convention; exposed so tests and docs can cite them)
     SCORING: SCORING, CATEGORIES: CATEGORIES, LABELS: LABELS, REVIEW_RULES: REVIEW_RULES,
     NEAR_MISS: NEAR_MISS, DURATION: DURATION, TIMER: TIMER, REVIEW_SHARE: REVIEW_SHARE, MODES: MODES,
-    RECORD_VERSION: RECORD_VERSION,
+    RECORD_VERSION: RECORD_VERSION, QUESTION_STATES: QUESTION_STATES, PANEL: PANEL,
     // answers
     normalizeAnswer: normalizeAnswer, levenshtein: levenshtein, classifyAnswer: classifyAnswer, allowedEdits: allowedEdits,
     // duration + timer
@@ -500,8 +549,8 @@
     // questions
     poolForMode: poolForMode, orderWithReviewWeighting: orderWithReviewWeighting, buildQuestions: buildQuestions, selectQuestions: selectQuestions,
     // session
-    createSession: createSession, currentQuestion: currentQuestion, answerCurrent: answerCurrent, skipCurrent: skipCurrent,
-    advance: advance, expireRemaining: expireRemaining,
+    createSession: createSession, currentQuestion: currentQuestion, setAnswer: setAnswer, leaveQuestion: leaveQuestion,
+    goTo: goTo, overview: overview, panelLabel: panelLabel, grade: grade, hasText: hasText,
     // results
     summarize: summarize, buildRecord: buildRecord, normalizeRecord: normalizeRecord,
     // formatting

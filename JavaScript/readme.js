@@ -124,7 +124,9 @@
       const hm = /^(#{1,6})\s+(.*?)\s*#*\s*$/.exec(line);
       if (hm) {
         const level = hm[1].length;
-        const el = h('h' + level, { class: 'md-h md-h' + level });
+        // The screen already has its own <h1> ("README"), so the document's headings sit one level
+        // lower (# → h2, ## → h3 …). The look still follows the Markdown level (md-h1, md-h2 …).
+        const el = h('h' + Math.min(6, level + 1), { class: 'md-h md-h' + level });
         inline(hm[2], el);
         el.id = uniqueId(el.textContent);
         root.appendChild(el);
