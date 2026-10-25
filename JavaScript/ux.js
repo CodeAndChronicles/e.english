@@ -33,20 +33,25 @@
     theme: 'eenglish.theme',
     themeColor: 'eenglish.themeColor',
     keepAwake: 'eenglish.keepAwake',
-    fontMode: 'eenglish.fontMode'
+    fontMode: 'eenglish.fontMode',
+    lang: 'eenglish.lang'
   };
   // Font style (Settings): 'o2' = headings Bold + body Regular (default), 'regular', 'bold'.
   const FONT_MODES = ['o2', 'regular', 'bold'];
   const DEFAULT_FONT_MODE = 'o2';
-  // 8 accent palettes: 4 deep + 4 soft (see CSS/root.css). "default" is not a
-  // palette — it means "no accent picked": the calm default look.
-  const THEME_COLORS = ['midnight', 'plum', 'petrol', 'umber', 'sky', 'lavender', 'rose', 'sand'];
+  // Selectable accents (see CSS/root.css): 6 + the neutral Default = 7 choices.
+  // "default" is not a palette — it means "no accent picked".
+  const THEME_COLORS = ['burgundy', 'lavender', 'sky', 'lime', 'orange', 'teal'];
+  // Palettes offered by earlier versions. They are NOT selectable any more, but a
+  // saved one is never deleted or remapped: it keeps rendering (its CSS is kept)
+  // until the person picks one of the choices above.
+  const RETIRED_COLORS = ['midnight', 'plum', 'petrol', 'umber', 'rose', 'sand'];
   const DEFAULT_COLOR = 'default';
   // Accent names saved by earlier versions → nearest new palette (or the
   // default look). Green no longer exists in any form.
   const LEGACY_COLOR_MAP = { blue: 'midnight', purple: 'plum', teal: 'petrol', orange: 'umber', lemon: 'sand', red: 'rose', gray: null, green: null };
   function normalizeColor(c) {
-    if (THEME_COLORS.indexOf(c) !== -1) return c;
+    if (THEME_COLORS.indexOf(c) !== -1 || RETIRED_COLORS.indexOf(c) !== -1) return c;
     if (Object.prototype.hasOwnProperty.call(LEGACY_COLOR_MAP, c)) return LEGACY_COLOR_MAP[c];
     return null; // unknown / removed → default look
   }
@@ -181,7 +186,8 @@
     theme: readLS(LS_KEYS.theme, null), // 'light' | 'dark' | 'system' | null (null behaves as 'system')
     themeColor: normalizeColor(readLS(LS_KEYS.themeColor, null)),
     keepAwake: readLS(LS_KEYS.keepAwake, false),
-    fontMode: readLS(LS_KEYS.fontMode, null)
+    fontMode: readLS(LS_KEYS.fontMode, null),
+    lang: readLS(LS_KEYS.lang, null)   // 'en' | 'ar' | null (null behaves as 'en')
   };
   // History saved by an earlier version is upgraded once, in storage too.
   (function migrateQuizHistory() {
@@ -1079,10 +1085,10 @@
     emit('font-mode-changed', mode);
   }
 
-  /* ---------------- Theme color (Settings: 8 accents + default) ---------------- */
+  /* ---------------- Theme color (Settings: 6 accents + default) ---------------- */
   // Returns a palette name, or 'default' when no accent is picked.
   function getThemeColor() {
-    return state.themeColor && THEME_COLORS.indexOf(state.themeColor) !== -1 ? state.themeColor : DEFAULT_COLOR;
+    return state.themeColor && (THEME_COLORS.indexOf(state.themeColor) !== -1 || RETIRED_COLORS.indexOf(state.themeColor) !== -1) ? state.themeColor : DEFAULT_COLOR;
   }
   // Accepts a palette name, or 'default' to go back to the calm default look.
   function setThemeColor(color) {
@@ -1097,6 +1103,21 @@
     }
     emit('theme-color-changed', getThemeColor());
   }
+
+  /* ---------------- Interface language (Settings + floating button) ----------------
+     One persisted preference ('en' | 'ar'). The words themselves live in
+     JavaScript/i18n.js; this only stores the choice and announces changes.
+     Learning data, quiz progress and the other preferences are never touched. */
+  const LANGS = ['en', 'ar'];
+  function getLanguage() { return LANGS.indexOf(state.lang) !== -1 ? state.lang : 'en'; }
+  function setLanguage(lang) {
+    if (LANGS.indexOf(lang) === -1) return;
+    state.lang = lang;
+    writeLS(LS_KEYS.lang, lang);
+    if (global.I18n) global.I18n.setLang(lang);
+    emit('language-changed', lang);
+  }
+  if (global.I18n) global.I18n.setLang(getLanguage());   // before the first paint
 
   /* ---------------- Keep screen awake (Settings) ---------------- */
   function getKeepAwake() { return !!state.keepAwake; }
@@ -1130,13 +1151,14 @@
       theme: getThemePreference(),
       themeColor: getThemeColor(),
       fontMode: getFontMode(),
+      lang: getLanguage(),
       keepAwake: state.keepAwake
     };
   }
   function isPlainObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
   function importAllData(obj) {
     if (!obj || typeof obj !== 'object') return false;
-    const recognized = ['known', 'manualReview', 'autoReview', 'quizHistory', 'theme', 'themeColor', 'fontMode', 'keepAwake'];
+    const recognized = ['known', 'manualReview', 'autoReview', 'quizHistory', 'theme', 'themeColor', 'fontMode', 'keepAwake', 'lang'];
     if (!recognized.some(function (k) { return obj[k] !== undefined; })) return false;
     try {
       let applied = false; // only report success if something valid was actually imported
@@ -1155,12 +1177,15 @@
       }
       const fontChanged = FONT_MODES.indexOf(obj.fontMode) !== -1;
       if (fontChanged) { state.fontMode = obj.fontMode; writeLS(LS_KEYS.fontMode, state.fontMode); applied = true; }
+      const langChanged = LANGS.indexOf(obj.lang) !== -1;
+      if (langChanged) { state.lang = obj.lang; writeLS(LS_KEYS.lang, state.lang); if (global.I18n) global.I18n.setLang(state.lang); applied = true; }
       if (typeof obj.keepAwake === 'boolean') { state.keepAwake = obj.keepAwake; writeLS(LS_KEYS.keepAwake, state.keepAwake); applied = true; }
       // Same rule as at startup: stored progress must match the content.
       reconcileStoredData();
       if (themeChanged) { emit('theme-preference-changed', getThemePreference()); emit('theme-changed', getTheme()); }
       if (colorChanged) emit('theme-color-changed', getThemeColor());
       if (fontChanged) emit('font-mode-changed', getFontMode());
+      if (langChanged) emit('language-changed', getLanguage());
       if (!applied) return false;
       emit('data-imported', {});
       return true;
@@ -1176,6 +1201,7 @@
     state.theme = null;
     state.themeColor = null;
     state.fontMode = null;
+    state.lang = null;
     state.keepAwake = false;
     Object.keys(LS_KEYS).forEach(function (k) {
       try { localStorage.removeItem(LS_KEYS[k]); } catch (e) {}
@@ -1400,6 +1426,7 @@
     reconcileStoredData: reconcileStoredData, getReviewWords: getReviewWords, getReviewSource: getReviewSource,
     getFontMode: getFontMode, setFontMode: setFontMode, getFontModes: function () { return FONT_MODES.slice(); },
     getThemeColor: getThemeColor, setThemeColor: setThemeColor, getThemeColors: function () { return THEME_COLORS.slice(); },
+    getLanguage: getLanguage, setLanguage: setLanguage,
     getKeepAwake: getKeepAwake, setKeepAwake: setKeepAwake,
     getQuizHistory: function () { return state.quizHistory.slice(); },
     getQuizPreview: getQuizPreview, getReviewReason: getReviewReason,

@@ -42,7 +42,7 @@
   }
   function slugify(text) {
     return String(text).toLowerCase().trim()
-      .replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      .replace(/[^\p{L}\p{N}_\s-]/gu, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   }
 
   const INLINE = /(`[^`]+`)|(!\[[^\]]*\]\([^)\s]+\))|(\[[^\]]+\]\([^)\s]+\))|(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*)/;
@@ -139,17 +139,17 @@
       if (line.indexOf('|') !== -1 && i + 1 < lines.length && isTableSep(lines[i + 1])) {
         const head = splitRow(line);
         const aligns = splitRow(lines[i + 1]).map(function (c) {
-          return /^:-+:$/.test(c) ? 'center' : (/-+:$/.test(c) ? 'right' : 'left');
+          return /^:-+:$/.test(c) ? 'center' : (/-+:$/.test(c) ? 'right' : 'start');
         });
         i += 2;
         const table = h('table', { class: 'md-table' });
         const thead = h('thead'), trh = h('tr');
-        head.forEach(function (c, k) { const th = h('th'); inline(c, th); th.style.textAlign = aligns[k] || 'left'; trh.appendChild(th); });
+        head.forEach(function (c, k) { const th = h('th'); inline(c, th); th.style.textAlign = aligns[k] || 'start'; trh.appendChild(th); });
         thead.appendChild(trh); table.appendChild(thead);
         const tbody = h('tbody');
         while (i < lines.length && lines[i].trim() && lines[i].indexOf('|') !== -1) {
           const tr = h('tr');
-          splitRow(lines[i]).forEach(function (c, k) { const td = h('td'); inline(c, td); td.style.textAlign = aligns[k] || 'left'; tr.appendChild(td); });
+          splitRow(lines[i]).forEach(function (c, k) { const td = h('td'); inline(c, td); td.style.textAlign = aligns[k] || 'start'; tr.appendChild(td); });
           tbody.appendChild(tr);
           i++;
         }
@@ -214,14 +214,53 @@
   }
 
   /* ---------------- Screen ---------------- */
-  let cachedText = null; // kept in memory for this session only
+  const T = global.I18n.t;
+  const cache = {};   // text per language, kept in memory for this session only
 
-  function loadReadme() {
-    if (cachedText !== null) return Promise.resolve(cachedText);
-    return fetch('README.md').then(function (res) {
-      if (!res.ok) throw new Error('README.md not found');
+  function loadReadme(lang) {
+    if (cache[lang] != null) return Promise.resolve(cache[lang]);
+    const file = lang === 'ar' ? 'README.ar.md' : 'README.md';
+    return fetch(file).then(function (res) {
+      if (!res.ok) throw new Error(file + ' not found');
       return res.text();
-    }).then(function (txt) { cachedText = txt; return txt; });
+    }).then(function (txt) { cache[lang] = txt; return txt; });
+  }
+
+  // The rendered Markdown is one flat list of blocks. Reorganize it into the
+  // same card design as the rest of the app: an intro card, a row of jump
+  // chips, and one card per "##" section (same content, same order).
+  function toSections(body) {
+    const kids = Array.prototype.slice.call(body.children);
+    const wrap = h('div', { class: 'readme-wrap' });
+    const hero = h('section', { class: 'card readme-hero' });
+    const chips = h('nav', { class: 'readme-toc', 'aria-label': T('Contents') });
+    const sections = h('div', { class: 'readme-sections' });
+    let current = hero;
+    kids.forEach(function (node) {
+      if (node.classList && node.classList.contains('md-h2')) {
+        const id = node.id;
+        const title = node.textContent;
+        // A hand-written "Contents" list is replaced by the chips below.
+        if (/^(contents|المحتويات)$/i.test(title.trim())) { current = null; return; }
+        current = h('section', { class: 'card readme-section' });
+        sections.appendChild(current);
+        current.appendChild(node);
+        chips.appendChild(h('a', { class: 'readme-chip', href: '#' + id, text: title }));
+        return;
+      }
+      if (current) current.appendChild(node);
+    });
+    wrap.appendChild(hero);
+    if (chips.children.length) wrap.appendChild(chips);
+    wrap.appendChild(sections);
+    wrap.addEventListener('click', function (e) {
+      const a = e.target.closest && e.target.closest('a.readme-chip');
+      if (!a) return;
+      e.preventDefault();
+      const target = wrap.querySelector('#' + (global.CSS && CSS.escape ? CSS.escape(a.getAttribute('href').slice(1)) : a.getAttribute('href').slice(1)));
+      if (target && target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return wrap;
   }
 
   function renderReadme() {
@@ -231,21 +270,32 @@
     if (global.UI && global.UI.showNav) global.UI.showNav('readme');
     if (global.UI && global.UI.setRoute) global.UI.setRoute({ screen: 'readme' });
 
-    screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'README' })]));
-    const card = h('article', { class: 'card readme-card' });
-    card.appendChild(h('p', { class: 'text-muted', text: 'Loading README...' }));
-    screen.appendChild(card);
+    screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: T('README') })]));
+    const holder = h('div', { class: 'readme-holder' });
+    holder.appendChild(h('p', { class: 'text-muted', text: T('Loading README...') }));
+    screen.appendChild(holder);
+    const lang = global.I18n.getLang();
 
-    loadReadme().then(function (txt) {
-      if (!card.isConnected) return; // user already left this screen
-      while (card.firstChild) card.removeChild(card.firstChild);
-      card.appendChild(render(txt));
+    loadReadme(lang).catch(function () {
+      // No Arabic file reachable: fall back to the English README rather than nothing.
+      return lang === 'ar' ? loadReadme('en') : Promise.reject(new Error('readme'));
+    }).then(function (txt) {
+      if (!holder.isConnected) return; // user already left this screen
+      while (holder.firstChild) holder.removeChild(holder.firstChild);
+      const body = render(txt);
+      holder.appendChild(toSections(body));
     }).catch(function () {
-      if (!card.isConnected) return;
-      while (card.firstChild) card.removeChild(card.firstChild);
-      card.appendChild(h('p', { class: 'empty-note', text: 'Could not load README.md. Check your connection and try again.' }));
+      if (!holder.isConnected) return;
+      while (holder.firstChild) holder.removeChild(holder.firstChild);
+      holder.appendChild(h('p', { class: 'empty-note', text: T('Could not load README.md. Check your connection and try again.') }));
     });
   }
+
+  global.I18n.extend({
+    'Loading README...': 'جارٍ تحميل اقرأني...',
+    'Could not load README.md. Check your connection and try again.': 'تعذّر تحميل ملف README. تحقق من اتصالك وحاول مرة أخرى.',
+    'Contents': 'المحتويات'
+  });
 
   global.UI = global.UI || {};
   global.UI.renderReadme = renderReadme;

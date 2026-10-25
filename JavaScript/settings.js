@@ -29,14 +29,14 @@
   function icon(name, extraClass) {
     return Icons.svg(name, extraClass);
   }
+  const T = global.I18n.t;   // English text is the key; Arabic when selected (JavaScript/i18n.js)
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
 
-  // 8 accent palettes in two groups of four (see CSS/root.css).
-  const COLOR_LABELS = { midnight: 'Midnight', plum: 'Plum', petrol: 'Petrol', umber: 'Umber', sky: 'Sky', lavender: 'Lavender', rose: 'Rose', sand: 'Sand' };
-  const COLOR_GROUPS = [
-    { title: 'Deep', colors: ['midnight', 'plum', 'petrol', 'umber'] },
-    { title: 'Soft', colors: ['sky', 'lavender', 'rose', 'sand'] }
-  ];
+  // Seven choices: Default + six palettes (see CSS/root.css). Palettes from earlier
+  // versions keep working (and keep their name here) but are not offered any more.
+  const COLOR_LABELS = { burgundy: 'Burgundy', lavender: 'Lavender', sky: 'Sky Blue', lime: 'Lime', orange: 'Orange', teal: 'Teal',
+    midnight: 'Midnight', plum: 'Plum', petrol: 'Petrol', umber: 'Umber', rose: 'Rose', sand: 'Sand' };
+  const COLOR_ORDER = ['burgundy', 'lavender', 'sky', 'lime', 'orange', 'teal'];
 
   // Advanced is collapsed every time Settings is opened from the nav; it only
   // stays open across the re-render that follows a successful import.
@@ -77,7 +77,7 @@
   }
 
   function showToast(msg, kind) {
-    const t = h('div', { class: 'settings-toast settings-toast-' + (kind || 'ok'), text: msg });
+    const t = h('div', { class: 'settings-toast settings-toast-' + (kind || 'ok'), text: T(msg) });
     document.body.appendChild(t);
     requestAnimationFrame(function () { t.classList.add('show'); });
     setTimeout(function () {
@@ -91,8 +91,8 @@
     return h('div', { class: 'settings-row' }, [
       h('span', { class: 'settings-row-icon ' + (tone || 'tone-blue') }, [icon(iconName)]),
       h('div', { class: 'settings-row-text' }, [
-        h('div', { class: 'settings-row-title', text: title }),
-        sub ? h('div', { class: 'settings-row-sub', text: sub }) : null
+        h('div', { class: 'settings-row-title', text: T(title) }),
+        sub ? h('div', { class: 'settings-row-sub', text: T(sub) }) : null
       ]),
       control
     ]);
@@ -123,7 +123,7 @@
   }
 
   function toggleSwitch(checked, onChange, label) {
-    const input = h('input', { type: 'checkbox', class: 'switch-input visually-hidden', role: 'switch', 'aria-label': label || 'Toggle' });
+    const input = h('input', { type: 'checkbox', class: 'switch-input visually-hidden', role: 'switch', 'aria-label': label ? T(label) : T('Toggle') });
     input.checked = !!checked;
     input.addEventListener('change', function () { onChange(input.checked); });
     return h('label', { class: 'switch' }, [input, h('span', { class: 'switch-track' })]);
@@ -138,26 +138,44 @@
     if (global.UI && global.UI.showNav) global.UI.showNav('settings');
     if (global.UI && global.UI.setRoute) global.UI.setRoute({ screen: 'settings' });
 
-    screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Settings' })]));
+    screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: T('Settings') })]));
 
     /* ---- Appearance ---- */
-    screen.appendChild(h('h2', { class: 'settings-section-title' }, [icon('palette'), h('span', { text: 'Appearance' })]));
+    screen.appendChild(h('h2', { class: 'settings-section-title' }, [icon('palette'), h('span', { text: T('Appearance') })]));
     const appearanceCard = h('div', { class: 'card settings-card' });
+
+    const langRow = h('div', { class: 'settings-row settings-row-block settings-row-flush' }, [
+      h('span', { class: 'settings-row-icon tone-blue' }, [icon('languages')]),
+      h('div', { class: 'settings-row-text' }, [
+        h('div', { class: 'settings-row-title', text: T('Language') }),
+        h('div', { class: 'settings-row-sub', text: T('Choose the language of the whole interface') })
+      ])
+    ]);
+    appearanceCard.appendChild(langRow);
+    const langSeg = segmented(
+      [{ value: 'ar', label: '\u0627\u0644\u0639\u0631\u0628\u064A\u0629' }, { value: 'en', label: 'English' }],
+      UX.getLanguage(),
+      function (val) { UX.setLanguage(val); }
+    );
+    langSeg.classList.add('segmented-full', 'segmented-lang');
+    langSeg.setAttribute('role', 'group');
+    langSeg.setAttribute('aria-label', T('Language'));
+    appearanceCard.appendChild(h('div', { class: 'settings-seg-wrap' }, [langSeg]));
 
     const themeRow = h('div', { class: 'settings-row settings-row-block' }, [
       h('span', { class: 'settings-row-icon tone-blue' }, [icon('sun-moon')]),
       h('div', { class: 'settings-row-text' }, [
-        h('div', { class: 'settings-row-title', text: 'Theme mode' }),
-        h('div', { class: 'settings-row-sub', text: 'Light, dark, or follow your device' })
+        h('div', { class: 'settings-row-title', text: T('Theme mode') }),
+        h('div', { class: 'settings-row-sub', text: T('Light, dark, or follow your device') })
       ])
     ]);
     themeRow.classList.add('settings-row-flush');
     appearanceCard.appendChild(themeRow);
     const themeSeg = segmented(
       [
-        { value: 'light', label: 'Light', icon: 'sun' },
-        { value: 'dark', label: 'Dark', icon: 'moon' },
-        { value: 'system', label: 'System', icon: 'monitor' }
+        { value: 'light', label: T('Light'), icon: 'sun' },
+        { value: 'dark', label: T('Dark'), icon: 'moon' },
+        { value: 'system', label: T('System'), icon: 'monitor' }
       ],
       UX.getThemePreference(),
       function (val) { UX.setTheme(val); }
@@ -173,14 +191,14 @@
     appearanceCard.appendChild(h('div', { class: 'settings-row settings-row-block settings-row-flush' }, [
       h('span', { class: 'settings-row-icon tone-blue' }, [icon('type')]),
       h('div', { class: 'settings-row-text' }, [
-        h('div', { class: 'settings-row-title', text: 'Font style' })
+        h('div', { class: 'settings-row-title', text: T('Font style') })
       ])
     ]));
     const fontSeg = segmented(
       [
         { value: 'o2', label: 'O2' },
-        { value: 'regular', label: 'Regular' },
-        { value: 'bold', label: 'Bold' }
+        { value: 'regular', label: T('Regular') },
+        { value: 'bold', label: T('Bold') }
       ],
       UX.getFontMode(),
       function (val) { UX.setFontMode(val); }
@@ -189,23 +207,23 @@
     fontSeg.setAttribute('role', 'group');
     fontSeg.setAttribute('aria-label', 'Font style');
     const fontHelp = h('ul', { class: 'font-help' }, [
-      h('li', {}, [h('strong', { text: 'O2' }), h('span', { class: 'font-help-tag', text: 'Recommended' }), ' \u2014 Bold headings, Regular text.']),
-      h('li', {}, [h('strong', { text: 'Regular' }), ' \u2014 All text Regular.']),
-      h('li', {}, [h('strong', { text: 'Bold' }), ' \u2014 All text Bold.'])
+      h('li', {}, [h('strong', { text: 'O2' }), h('span', { class: 'font-help-tag', text: T('Recommended') }), ' \u2014 ' + T('Bold headings, Regular text.')]),
+      h('li', {}, [h('strong', { text: T('Regular') }), ' \u2014 ' + T('All text Regular.')]),
+      h('li', {}, [h('strong', { text: T('Bold') }), ' \u2014 ' + T('All text Bold.')])
     ]);
     appearanceCard.appendChild(h('div', { class: 'settings-seg-wrap' }, [fontSeg, fontHelp]));
 
     const colorRow = h('div', { class: 'settings-row settings-row-block' }, [
       h('span', { class: 'settings-row-icon tone-blue' }, [icon('swatch-book')]),
       h('div', { class: 'settings-row-text' }, [
-        h('div', { class: 'settings-row-title', text: 'Accent color' }),
-        h('div', { class: 'settings-row-sub', text: 'Default is a calm blue. Pick a palette to use one accent everywhere.' })
+        h('div', { class: 'settings-row-title', text: T('Accent color') }),
+        h('div', { class: 'settings-row-sub', text: T('Default is a neutral graphite. Pick a palette to use one accent everywhere.') })
       ])
     ]);
     colorRow.classList.add('settings-row-flush');
     appearanceCard.appendChild(colorRow);
 
-    const colorPicker = h('div', { class: 'theme-color-picker', role: 'group', 'aria-label': 'Accent color' });
+    const colorPicker = h('div', { class: 'theme-color-picker', role: 'group', 'aria-label': T('Accent color') });
     function markActiveColor() {
       const cur = UX.getThemeColor();
       colorPicker.querySelectorAll('.theme-color-swatch').forEach(function (b) {
@@ -224,19 +242,21 @@
       ]);
       return b;
     }
-    // "Default" is not one of the 8 palettes: it is the way back to the
-    // calm default look with no accent picked.
-    colorPicker.appendChild(h('div', { class: 'theme-color-group theme-color-default' }, [
-      swatchButton('default', 'Default', 'swatch-default')
-    ]));
-    COLOR_GROUPS.forEach(function (g) {
-      const grid = h('div', { class: 'theme-color-grid' });
-      g.colors.forEach(function (c) { grid.appendChild(swatchButton(c, COLOR_LABELS[c] || c, 'swatch-' + c)); });
-      colorPicker.appendChild(h('div', { class: 'theme-color-group' }, [
-        h('div', { class: 'theme-color-group-title', text: g.title }),
-        grid
+    // "Default" is not a palette: it is the neutral look with no accent picked.
+    // Seven choices in one grid: Default + six palettes.
+    const grid = h('div', { class: 'theme-color-grid' });
+    grid.appendChild(swatchButton('default', T('Default'), 'swatch-default'));
+    COLOR_ORDER.forEach(function (c) { grid.appendChild(swatchButton(c, T(COLOR_LABELS[c]), 'swatch-' + c)); });
+    colorPicker.appendChild(grid);
+    // A saved palette from an earlier version is never removed or remapped behind
+    // the person's back: it keeps working until they pick one of the seven.
+    const cur0 = UX.getThemeColor();
+    if (cur0 !== 'default' && COLOR_ORDER.indexOf(cur0) === -1) {
+      colorPicker.appendChild(h('p', { class: 'palette-retired-note' }, [
+        h('span', { class: 'swatch-dot swatch-' + cur0 }),
+        h('span', { text: T('Your current palette ({name}) is no longer offered. Pick one of the seven.', { name: T(COLOR_LABELS[cur0] || cur0) }) })
       ]));
-    });
+    }
     appearanceCard.appendChild(colorPicker);
     markActiveColor();
 
@@ -273,7 +293,7 @@
       }
     }, [
       icon('sliders-horizontal', 'advanced-toggle-icon'),
-      h('span', { class: 'advanced-toggle-label', text: 'Advanced' }),
+      h('span', { class: 'advanced-toggle-label', text: T('Advanced') }),
       icon('chevron-down', 'advanced-chevron')
     ]);
     screen.appendChild(h('div', { class: 'settings-advanced' }, [advancedToggle, advancedPanel]));
@@ -289,9 +309,9 @@
         downloadJSON(data, 'eenglish-backup-' + stamp + '.json');
         showToast('Your data was exported', 'ok');
       }
-    }, [icon('download'), h('span', { text: 'Export Data' })]));
+    }, [icon('download'), h('span', { text: T('Export Data') })]));
 
-    const importInput = h('input', { type: 'file', accept: 'application/json', class: 'visually-hidden', 'aria-label': 'Choose a backup file to import', tabindex: '-1' });
+    const importInput = h('input', { type: 'file', accept: 'application/json', class: 'visually-hidden', 'aria-label': T('Choose a backup file to import'), tabindex: '-1' });
     importInput.addEventListener('change', function () {
       const file = importInput.files && importInput.files[0];
       if (!file) return;
@@ -300,7 +320,7 @@
         let parsed = null;
         try { parsed = JSON.parse(String(reader.result)); } catch (e) { parsed = null; }
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          if (!confirm('Importing will replace your current progress with the data in this file. Continue?')) return;
+          if (!confirm(T('Importing will replace your current progress with the data in this file. Continue?'))) return;
         }
         if (parsed && UX.importAllData(parsed)) {
           showToast('Data imported successfully', 'ok');
@@ -316,18 +336,18 @@
     dataCard.appendChild(h('button', {
       class: 'btn btn-secondary settings-action-btn',
       onclick: function () { importInput.click(); }
-    }, [icon('upload'), h('span', { text: 'Import Data' })]));
+    }, [icon('upload'), h('span', { text: T('Import Data') })]));
 
     dataCard.appendChild(h('button', {
       class: 'btn btn-danger settings-action-btn',
       onclick: function () {
-        if (confirm('Are you sure? All your progress (learned words, review lists, and quiz history) will be deleted permanently.')) {
+        if (confirm(T('Are you sure? All your progress (learned words, review lists, and quiz history) will be deleted permanently.'))) {
           releaseWakeLock();
           UX.resetAllData();
           global.location.reload();
         }
       }
-    }, [icon('trash-2'), h('span', { text: 'Delete All Data' })]));
+    }, [icon('trash-2'), h('span', { text: T('Delete All Data') })]));
     advancedPanel.appendChild(dataCard);
 
     /* ---- Advanced: device / browser capabilities ----
@@ -335,31 +355,31 @@
        guessed or computed indirectly. If the API isn't exposed by this
        browser, the row shows "N/A" instead of a fabricated number. */
     const deviceCard = h('div', { class: 'card settings-card device-info-card' });
-    deviceCard.appendChild(h('div', { class: 'settings-row-title device-info-head' }, [icon('monitor-smartphone'), h('span', { text: 'Device & Browser' })]));
+    deviceCard.appendChild(h('div', { class: 'settings-row-title device-info-head' }, [icon('monitor-smartphone'), h('span', { text: T('Device & Browser') })]));
 
     function infoRow(label, value) {
       return h('div', { class: 'device-info-row' }, [
-        h('span', { class: 'text-muted', text: label }),
+        h('span', { class: 'text-muted', text: T(label) }),
         h('span', { class: 'device-info-value', text: value })
       ]);
     }
     const nav = global.navigator || {};
     const rowsWrap = h('div', { class: 'device-info-rows' });
-    rowsWrap.appendChild(infoRow('Logical CPU cores', typeof nav.hardwareConcurrency === 'number' ? String(nav.hardwareConcurrency) : 'N/A'));
-    rowsWrap.appendChild(infoRow('Approx. memory (RAM)', typeof nav.deviceMemory === 'number' ? (nav.deviceMemory + ' GB') : 'N/A'));
-    rowsWrap.appendChild(infoRow('Connection type', (nav.connection && nav.connection.effectiveType) ? nav.connection.effectiveType : 'N/A'));
-    rowsWrap.appendChild(infoRow('Connection status', typeof nav.onLine === 'boolean' ? (nav.onLine ? 'Online' : 'Offline') : 'N/A'));
-    rowsWrap.appendChild(infoRow('Platform', nav.platform || (nav.userAgentData && nav.userAgentData.platform) || 'N/A'));
-    rowsWrap.appendChild(infoRow('Browser language', nav.language || 'N/A'));
-    rowsWrap.appendChild(infoRow('Screen size', (global.screen && global.screen.width) ? (global.screen.width + ' × ' + global.screen.height + ' px') : 'N/A'));
-    rowsWrap.appendChild(infoRow('Pixel density (DPR)', typeof global.devicePixelRatio === 'number' ? String(global.devicePixelRatio) : 'N/A'));
-    const storageRow = infoRow('Storage used', 'Calculating...');
+    rowsWrap.appendChild(infoRow('Logical CPU cores', typeof nav.hardwareConcurrency === 'number' ? String(nav.hardwareConcurrency) : T('N/A')));
+    rowsWrap.appendChild(infoRow('Approx. memory (RAM)', typeof nav.deviceMemory === 'number' ? (nav.deviceMemory + ' GB') : T('N/A')));
+    rowsWrap.appendChild(infoRow('Connection type', (nav.connection && nav.connection.effectiveType) ? nav.connection.effectiveType : T('N/A')));
+    rowsWrap.appendChild(infoRow('Connection status', typeof nav.onLine === 'boolean' ? (nav.onLine ? T('Online') : T('Offline')) : T('N/A')));
+    rowsWrap.appendChild(infoRow('Platform', nav.platform || (nav.userAgentData && nav.userAgentData.platform) || T('N/A')));
+    rowsWrap.appendChild(infoRow('Browser language', nav.language || T('N/A')));
+    rowsWrap.appendChild(infoRow('Screen size', (global.screen && global.screen.width) ? (global.screen.width + ' × ' + global.screen.height + ' px') : T('N/A')));
+    rowsWrap.appendChild(infoRow('Pixel density (DPR)', typeof global.devicePixelRatio === 'number' ? String(global.devicePixelRatio) : T('N/A')));
+    const storageRow = infoRow('Storage used', T('Calculating...'));
     rowsWrap.appendChild(storageRow);
     deviceCard.appendChild(rowsWrap);
     advancedPanel.appendChild(deviceCard);
 
     function formatBytes(n) {
-      if (typeof n !== 'number' || !isFinite(n)) return 'N/A';
+      if (typeof n !== 'number' || !isFinite(n)) return T('N/A');
       if (n < 1024) return n + ' B';
       const units = ['KB', 'MB', 'GB', 'TB'];
       let v = n, i = -1;
@@ -377,10 +397,10 @@
         nav.storage.estimate().then(function (est) {
           const used = formatBytes(est && est.usage);
           const quota = formatBytes(est && est.quota);
-          valueEl.textContent = (used === 'N/A' || quota === 'N/A') ? 'N/A' : (used + ' / ' + quota);
-        }).catch(function () { valueEl.textContent = 'N/A'; });
+          valueEl.textContent = (used === T('N/A') || quota === T('N/A')) ? T('N/A') : (used + ' / ' + quota);
+        }).catch(function () { valueEl.textContent = T('N/A'); });
       } else {
-        valueEl.textContent = 'N/A';
+        valueEl.textContent = T('N/A');
       }
     }
     if (advancedOpen) fillStorageRow();

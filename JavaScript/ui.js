@@ -28,13 +28,16 @@
     return Icons.svg(name, extraClass);
   }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
-  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+  // Text comes from JavaScript/i18n.js (English text is the key; Arabic when selected).
+  const T = global.I18n.t;
+  function plural(n, one, many) { return n + ' ' + global.I18n.plural(n, one, many); }
+  function tmin(s) { return String(s).replace(/\bmin\b/, T('min')); }   // "14–20 min" → Arabic unit
   // Pure formatting / labels only (no logic, no state) come from the quiz
   // engine so a score, a percentage or a clock is written the same everywhere.
   const QE = global.QuizEngine;
 
-  const el = { screen: null, nav: null, sideNav: null, themeBtn: null };
-  const NAV_ICONS = { home: 'house', statistics: 'chart-column', history: 'history', settings: 'settings', info: 'info', readme: 'book-open-text' };
+  const el = { screen: null, nav: null, sideNav: null, themeBtn: null, langBtn: null };
+  const NAV_ICONS = { home: 'house', statistics: 'chart-column', history: 'history', settings: 'settings', info: 'info', readme: 'book-open-text', feedback: 'message-circle' };
   let route = { screen: 'home' };
   let lessonProgressRef = null; // { unit, lessonKey, fillEl, textEl } — live-updated, not rebuilt
   let lessonQuizRef = null; // { unit, lessonKey, selectedBtn, selectedMeta, hintEl } — Selected Quiz availability + estimate, live-updated
@@ -73,6 +76,7 @@
         else if (b.dataset.nav === 'settings' && global.UI && global.UI.renderSettings) global.UI.renderSettings();
         else if (b.dataset.nav === 'info') renderInfo();
         else if (b.dataset.nav === 'readme' && global.UI && global.UI.renderReadme) global.UI.renderReadme();
+        else if (b.dataset.nav === 'feedback' && global.UI && global.UI.renderFeedback) global.UI.renderFeedback();
       });
     });
   }
@@ -96,8 +100,8 @@
     clear(el.themeBtn);
     el.themeBtn.appendChild(icon(THEME_META[pref].icon));
     el.themeBtn.setAttribute('data-mode', pref);
-    el.themeBtn.setAttribute('title', 'Theme: ' + THEME_META[pref].label);
-    el.themeBtn.setAttribute('aria-label', 'Theme: ' + THEME_META[pref].label + '. Switch to ' + THEME_META[next].label + '.');
+    el.themeBtn.setAttribute('title', T('Theme') + ': ' + T(THEME_META[pref].label));
+    el.themeBtn.setAttribute('aria-label', T('Theme') + ': ' + T(THEME_META[pref].label) + '. ' + T('Switch to') + ' ' + T(THEME_META[next].label) + '.');
   }
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
@@ -207,7 +211,8 @@
     derivatives: { label: 'Derivatives', icon: 'list-tree', className: 'sec-derivatives' }
   };
   function sectionMeta(type) {
-    return SECTION_META[type] || { label: String(type).replace(/_/g, ' '), icon: 'file-text', className: 'sec-generic' };
+    const m = SECTION_META[type] || { label: String(type).replace(/_/g, ' '), icon: 'file-text', className: 'sec-generic' };
+    return { label: T(m.label), icon: m.icon, className: m.className };
   }
 
   /* ================= Skeleton ================= */
@@ -230,12 +235,12 @@
     eachNav(function (n) { n.hidden = true; });
     const wrap = h('div', { class: 'card blocked-card' }, [
       icon('server-off', 'blocked-icon'),
-      h('h1', { class: 'title-lg', text: 'Run the site from a local server' }),
-      h('p', { class: 'text-muted', text: 'Browsers block reading the Files/*.md lessons when index.html is opened directly by double-click.' }),
+      h('h1', { class: 'title-lg', text: T('Run the site from a local server') }),
+      h('p', { class: 'text-muted', text: T('Browsers block reading the Files/*.md lessons when index.html is opened directly by double-click.') }),
       h('ol', { class: 'blocked-steps' }, [
-        h('li', { text: 'With VS Code: install the Live Server extension and open index.html with it.' }),
-        h('li', { text: 'Or open a terminal in the project folder and run: python -m http.server 8000' }),
-        h('li', { text: 'Then open http://localhost:8000 in your browser.' })
+        h('li', { text: T('With VS Code: install the Live Server extension and open index.html with it.') }),
+        h('li', { text: T('Or open a terminal in the project folder and run: python -m http.server 8000') }),
+        h('li', { text: T('Then open http://localhost:8000 in your browser.') })
       ])
     ]);
     el.screen.appendChild(wrap);
@@ -251,13 +256,13 @@
       h('img', { src: 'Ui/Logo.png', alt: 'e.english', class: 'app-logo' }),
       h('div', {}, [
         h('h1', { class: 'title-xl', text: 'e.english' }),
-        h('p', { class: 'text-muted', text: 'Choose a unit to start studying' })
+        h('p', { class: 'text-muted', text: T('Choose a unit to start studying') })
       ])
     ]));
 
     const searchBox = h('div', { class: 'search-box' });
     searchBox.appendChild(icon('search', 'search-icon'));
-    const searchInput = h('input', { type: 'text', class: 'search-input', placeholder: 'Search for a word...', 'aria-label': 'Search words' });
+    const searchInput = h('input', { type: 'text', class: 'search-input', dir: 'auto', placeholder: T('Search for a word...'), 'aria-label': T('Search words') });
     searchInput.addEventListener('input', function () { UX.search(searchInput.value); });
     searchBox.appendChild(searchInput);
     el.screen.appendChild(searchBox);
@@ -266,7 +271,7 @@
     unitProgressRefs = null;
     const list = h('div', { class: 'card-grid' });
     if (!units.length) {
-      list.appendChild(h('p', { class: 'empty-note', text: 'No content is available right now.' }));
+      list.appendChild(h('p', { class: 'empty-note', text: T('No content is available right now.') }));
     } else {
       unitProgressRefs = {};
       units.forEach(function (unit) {
@@ -275,13 +280,13 @@
         const prog = UX.getUnitProgress(unit.unit);
         const fill = h('div', { class: 'progress-fill' });
         fill.style.width = pct(prog.progress);
-        const bar = h('div', { class: 'progress-bar progress-sm', role: 'progressbar', 'aria-label': 'Unit ' + unit.unit + ' progress', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(prog.progress * 100)) }, [fill]);
+        const bar = h('div', { class: 'progress-bar progress-sm', role: 'progressbar', 'aria-label': T('Unit ') + unit.unit + ' ' + T('progress'), 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(prog.progress * 100)) }, [fill]);
         const pctEl = h('span', { class: 'unit-progress-pct', text: pctLabel(prog.progress) });
         unitProgressRefs[unit.unit] = { fill: fill, pct: pctEl, bar: bar };
         list.appendChild(h('button', { class: 'nav-card nav-card-unit tone-blue', onclick: function () { renderUnit(unit.unit); } }, [
           icon('library', 'nav-card-icon'),
           h('div', { class: 'nav-card-text' }, [
-            h('div', { class: 'nav-card-title', text: 'Unit ' + unit.unit }),
+            h('div', { class: 'nav-card-title', text: T('Unit ') + unit.unit }),
             h('div', { class: 'nav-card-sub', text: plural(unit.lessons.length, 'lesson set', 'lesson sets') }),
             h('div', { class: 'unit-progress' }, [bar, pctEl])
           ]),
@@ -302,7 +307,7 @@
     if (!results.length) {
       // Say so when a search finds nothing (instead of silently showing nothing).
       const q = payload && payload.query ? String(payload.query).trim() : '';
-      if (q) container.appendChild(h('p', { class: 'empty-note search-empty', text: 'No words found for \u201C' + q + '\u201D.' }));
+      if (q) container.appendChild(h('p', { class: 'empty-note search-empty', text: T('No words found for \u201C') + q + '\u201D.' }));
       return;
     }
     container.appendChild(h('div', { class: 'search-results-head', text: plural(results.length, 'result', 'results') }));
@@ -326,8 +331,8 @@
     if (!unit) { renderHome(); return; }
 
     el.screen.appendChild(h('header', { class: 'app-header' }, [
-      h('button', { class: 'icon-btn back-btn', 'aria-label': 'Back', onclick: renderHome }, [icon('arrow-left')]),
-      h('h1', { class: 'title-lg', text: 'Unit ' + unitNum })
+      h('button', { class: 'icon-btn back-btn', 'aria-label': T('Back'), onclick: renderHome }, [icon('arrow-left')]),
+      h('h1', { class: 'title-lg', text: T('Unit ') + unitNum })
     ]));
 
     const list = h('div', { class: 'card-grid' });
@@ -336,7 +341,7 @@
       list.appendChild(h('button', { class: 'nav-card', onclick: function () { renderLesson(unitNum, key); } }, [
         icon('notebook-text', 'nav-card-icon tone-blue'),
         h('div', { class: 'nav-card-text' }, [
-          h('div', { class: 'nav-card-title', text: 'Lesson ' + lesson.lessons.join('-') }),
+          h('div', { class: 'nav-card-title', text: T('Lesson ') + lesson.lessons.join('-') }),
           h('div', { class: 'nav-card-sub', text: plural(lesson.sections.length, 'section', 'sections') })
         ]),
         icon('chevron-right', 'nav-card-chevron')
@@ -357,8 +362,8 @@
     if (!lesson) { renderUnit(unitNum); return; }
 
     el.screen.appendChild(h('header', { class: 'app-header' }, [
-      h('button', { class: 'icon-btn back-btn', 'aria-label': 'Back to the unit', onclick: function () { renderUnit(unitNum); } }, [icon('arrow-left')]),
-      h('h1', { class: 'title-lg', text: 'Unit ' + unitNum + ' · Lesson ' + lessonKey })
+      h('button', { class: 'icon-btn back-btn', 'aria-label': T('Back to the unit'), onclick: function () { renderUnit(unitNum); } }, [icon('arrow-left')]),
+      h('h1', { class: 'title-lg', text: T('Unit ') + unitNum + ' · ' + T('Lesson ') + lessonKey })
     ]));
 
     const groupOfFocus = opts.focusWordId ? findGroupIndexForWord(lesson, opts.focusWordId) : null;
@@ -377,7 +382,7 @@
           h('span', { class: 'section-icon-badge section-icon-warning' }, [icon('triangle-alert')]),
           h('div', { class: 'section-head-text' }, [
             h('h2', { class: 'section-title', text: meta.label }),
-            h('span', { class: 'section-count text-warning', text: 'This section could not be loaded' })
+            h('span', { class: 'section-count text-warning', text: T('This section could not be loaded') })
           ])
         ])
       ]));
@@ -416,16 +421,16 @@
         const fullBtn = h('button', {
           class: 'btn btn-primary quiz-launch',
           onclick: function () { if (UX.startFullQuiz(unitNum, lessonKey)) renderQuiz(); }
-        }, [icon('clipboard-list'), h('span', { class: 'quiz-launch-text' }, [h('span', { class: 'quiz-launch-title', text: 'Full Quiz' }), fullMeta])]);
+        }, [icon('clipboard-list'), h('span', { class: 'quiz-launch-text' }, [h('span', { class: 'quiz-launch-title', text: T('Full Quiz') }), fullMeta])]);
         const selectedBtn = h('button', {
           class: 'btn btn-secondary quiz-launch' + (canSelected ? '' : ' is-disabled'),
           disabled: !canSelected,
           onclick: function () { if (UX.canStartSelectedQuiz(unitNum, lessonKey) && UX.startSelectedQuiz(unitNum, lessonKey)) renderQuiz(); }
-        }, [icon('list-checks'), h('span', { class: 'quiz-launch-text' }, [h('span', { class: 'quiz-launch-title', text: 'Selected Quiz' }), selectedMeta])]);
+        }, [icon('list-checks'), h('span', { class: 'quiz-launch-text' }, [h('span', { class: 'quiz-launch-title', text: T('Selected Quiz') }), selectedMeta])]);
         row.appendChild(fullBtn);
         row.appendChild(selectedBtn);
         card.appendChild(row);
-        const hintEl = h('p', { class: 'hint-note', text: 'Mark some words as learned first to unlock the Selected Quiz.' });
+        const hintEl = h('p', { class: 'hint-note', text: T('Mark some words as learned first to unlock the Selected Quiz.') });
         hintEl.hidden = canSelected;
         card.appendChild(hintEl);
         lessonQuizRef = { unit: unitNum, lessonKey: lessonKey, selectedBtn: selectedBtn, selectedMeta: selectedMeta, hintEl: hintEl };
@@ -483,18 +488,18 @@
     const cb = customCheckbox({
       checked: UX.getGroupTriState(wordIds) === 'checked',
       extraClass: 'group-cb',
-      ariaLabel: 'Mark every word in this group as learned',
+      ariaLabel: T('Mark every word in this group as learned'),
       onchange: function (checked) { UX.setGroupKnown(wordIds, checked); }
     });
     applyTriState(cb._input, UX.getGroupTriState(wordIds));
 
-    const toggleBtn = h('button', { class: 'group-toggle', 'aria-label': 'Expand or collapse group', 'aria-expanded': forceOpen ? 'true' : 'false' }, [
+    const toggleBtn = h('button', { class: 'group-toggle', 'aria-label': T('Expand or collapse group'), 'aria-expanded': forceOpen ? 'true' : 'false' }, [
       icon('chevron-right', 'group-chevron')
     ]);
 
     const head = h('div', { class: 'group-head' }, [
       cb,
-      h('span', { class: 'group-title', text: group.title || ('Group ' + (groupIdx + 1)) }),
+      h('span', { class: 'group-title', text: group.title || (T('Group ') + (groupIdx + 1)) }),
       h('span', { class: 'group-count', text: known + '/' + wordIds.length }),
       toggleBtn
     ]);
@@ -543,7 +548,7 @@
         const isSyn = /syn/i.test(k);
         chips.appendChild(h('span', { class: 'extra-chip' }, [
           icon(isSyn ? 'equal' : 'equal-not', 'extra-chip-icon'),
-          h('span', { class: 'visually-hidden', text: k + ': ' }),
+          h('span', { class: 'visually-hidden', text: T(k) + ': ' }),
           h('span', { class: 'extra-chip-text', dir: 'auto', text: w.extras[k] })
         ]));
       });
@@ -569,7 +574,7 @@
       if (!words.length) return;
       const list = h('ul', { class: 'related-list' });
       words.forEach(function (x) { list.appendChild(h('li', { class: 'related-chip', text: x })); });
-      wrap.appendChild(h('section', { class: 'related-group ' + (isSyn ? 'related-syn' : 'related-ant'), 'aria-label': isSyn ? 'Synonyms' : 'Antonyms' }, [
+      wrap.appendChild(h('section', { class: 'related-group ' + (isSyn ? 'related-syn' : 'related-ant'), 'aria-label': isSyn ? T('Synonyms') : T('Antonyms') }, [
         h('h3', { class: 'related-title' }, [icon(isSyn ? 'equal' : 'arrow-left-right', 'related-icon'), h('span', { text: isSyn ? 'Synonyms' : 'Antonyms' })]),
         list
       ]));
@@ -587,7 +592,7 @@
       extraClass: 'word-cb',
       onchange: function () { UX.toggleKnown(w.wordId); }
     });
-    cb._input.setAttribute('aria-label', 'Mark as learned: ' + w.word);
+    cb._input.setAttribute('aria-label', T('Mark as learned: ') + w.word);
 
     const identity = h('div', { class: 'word-identity' }, [h('span', { class: 'word-text', text: w.word })]);
     if (w.pos) identity.appendChild(renderPosBadges(w.pos));
@@ -595,7 +600,7 @@
     const easy = w.status === 'easy';
     const diff = h('span', { class: 'diff-badge ' + (easy ? 'diff-easy' : 'diff-hard') }, [
       icon(easy ? 'smile' : 'flame'),
-      h('span', { text: easy ? 'Easy' : 'Hard' })
+      h('span', { text: easy ? T('Easy') : T('Hard') })
     ]);
     card.appendChild(h('header', { class: 'word-card-head' }, [cb, identity, diff]));
     card.appendChild(h('p', { class: 'word-meaning', dir: 'auto', text: w.meaning }));
@@ -642,15 +647,15 @@
       stateIcon.appendChild(icon(known ? 'circle-check' : 'circle-dashed'));
     }
     const stateText = card.querySelector('.word-state-text');
-    if (stateText) stateText.textContent = known ? 'Learned' : 'Not learned';
+    if (stateText) stateText.textContent = known ? T('Learned') : T('Not learned');
 
     const flag = card.querySelector('.flag-btn');
     if (flag) {
       flag.classList.toggle('active', review);
       flag.setAttribute('aria-pressed', review ? 'true' : 'false');
-      flag.setAttribute('aria-label', review ? 'Remove from review' : 'Add to review');
+      flag.setAttribute('aria-label', review ? T('Remove from review') : T('Add to review'));
       const label = flag.querySelector('.flag-label');
-      if (label) label.textContent = review ? 'In review' : 'Review';
+      if (label) label.textContent = review ? T('In review') : T('Review');
     }
   }
 
@@ -677,8 +682,8 @@
   // estimated range (see QuizEngine.estimateDuration). The range is an
   // estimate; the timer's real limit is deliberately higher.
   function quizMetaText(preview) {
-    if (!preview.count) return 'No words yet';
-    return 'Estimated time: ' + preview.label + ' \u00B7 ' + plural(preview.count, 'word', 'words');
+    if (!preview.count) return T('No words yet');
+    return T('Estimated time: ') + tmin(preview.label) + ' \u00B7 ' + plural(preview.count, 'word', 'words');
   }
   // The Selected Quiz needs at least one learned word — follow the state
   // live, including its word count and estimated time.
@@ -690,7 +695,7 @@
     lessonQuizRef.hintEl.hidden = can;
     lessonQuizRef.selectedMeta.textContent = can
       ? quizMetaText(UX.getQuizPreview(lessonQuizRef.unit, lessonQuizRef.lessonKey, 'selected'))
-      : 'Learn some words to unlock';
+      : T('Learn some words to unlock');
   }
 
   // Vocabulary-only progress bar inside the lesson's Vocabulary section
@@ -705,7 +710,7 @@
   function renderReviewInto(container, stats) {
     clear(container);
     if (!stats.reviewWords.length) {
-      container.appendChild(h('p', { class: 'empty-note', text: 'Nothing to review right now. Nice work!' }));
+      container.appendChild(h('p', { class: 'empty-note', text: T('Nothing to review right now. Nice work!') }));
     } else {
       stats.reviewWords.forEach(function (r) {
         container.appendChild(h('button', { class: 'result-row review-row', onclick: function () { navigateToWord(r.wordId); } }, [
@@ -746,17 +751,17 @@
       const t = typeStat(stats, type), r = statsRefs.types[type];
       r.fill.style.width = pct(t.progress);
       r.pct.textContent = pctLabel(t.progress);
-      r.count.textContent = t.known + ' / ' + t.total + ' words';
+      r.count.textContent = t.known + ' / ' + t.total + ' ' + T('words');
     });
     statsRefs.overallFill.style.width = pct(stats.overall.progress);
     statsRefs.overallPct.textContent = pctLabel(stats.overall.progress);
-    statsRefs.overallText.textContent = stats.overall.known + ' of ' + stats.overall.total + ' words learned';
-    statsRefs.reviewHead.textContent = 'Words to review (' + stats.reviewWords.length + ')';
+    statsRefs.overallText.textContent = T('{k} of {n} words learned', { k: stats.overall.known, n: stats.overall.total });
+    statsRefs.reviewHead.textContent = T('Words to review (') + stats.reviewWords.length + ')';
     renderReviewInto(statsRefs.reviewListEl, stats);
   }
 
   function statLabel(type) {
-    return type === 'vocabulary' ? 'Vocabulary progress' : sectionMeta(type).label;
+    return type === 'vocabulary' ? T('Vocabulary progress') : sectionMeta(type).label;
   }
 
   /* ================= Statistics ================= */
@@ -765,23 +770,23 @@
     clear(el.screen);
     const stats = UX.getStatistics();
 
-    el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Statistics' })]));
+    el.screen.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: T('Statistics') })]));
 
     // 1) Overall progress first: one big number, one bar.
     const overallPct = h('span', { class: 'stats-hero-pct', text: pctLabel(stats.overall.progress) });
-    const overallText = h('span', { class: 'stats-hero-count', text: stats.overall.known + ' of ' + stats.overall.total + ' words learned' });
+    const overallText = h('span', { class: 'stats-hero-count', text: T('{k} of {n} words learned', { k: stats.overall.known, n: stats.overall.total }) });
     const overallFill = h('div', { class: 'progress-fill' });
     overallFill.style.width = pct(stats.overall.progress);
-    el.screen.appendChild(h('section', { class: 'card stats-hero tone-blue', 'aria-label': 'Overall progress' }, [
-      h('div', { class: 'stats-hero-label', text: 'Overall progress' }),
+    el.screen.appendChild(h('section', { class: 'card stats-hero tone-blue', 'aria-label': T('Overall progress') }, [
+      h('div', { class: 'stats-hero-label', text: T('Overall progress') }),
       h('div', { class: 'stats-hero-main' }, [overallPct, overallText]),
-      h('div', { class: 'progress-bar progress-lg', role: 'progressbar', 'aria-label': 'Overall progress' }, [overallFill])
+      h('div', { class: 'progress-bar progress-lg', role: 'progressbar', 'aria-label': T('Overall progress') }, [overallFill])
     ]));
 
     // 2) Progress per content type, grouped in ONE card (rows, not four cards).
     // Order follows SECTION_META; each type is counted on its own, so one
     // never dilutes another.
-    el.screen.appendChild(h('h2', { class: 'stats-section-title', text: 'By content type' }));
+    el.screen.appendChild(h('h2', { class: 'stats-section-title', text: T('By content type') }));
     const typeRefs = {};
     const typesList = h('div', { class: 'card stats-types' });
     Object.keys(SECTION_META).forEach(function (type) {
@@ -789,20 +794,20 @@
       const meta = sectionMeta(type);
       const fill = h('div', { class: 'progress-fill' });
       fill.style.width = pct(t.progress);
-      const count = h('span', { class: 'stats-type-count', text: t.known + ' / ' + t.total + ' words' });
+      const count = h('span', { class: 'stats-type-count', text: t.known + ' / ' + t.total + ' ' + T('words') });
       const pctEl = h('span', { class: 'stats-type-pct', text: pctLabel(t.progress) });
       typesList.appendChild(h('div', { class: 'stats-type stats-card-' + type + ' ' + meta.className }, [
         h('span', { class: 'stats-type-badge' }, [icon(meta.icon)]),
         h('div', { class: 'stats-type-text' }, [h('span', { class: 'stats-type-label', text: statLabel(type) }), count]),
         pctEl,
-        h('div', { class: 'progress-bar stats-type-bar', role: 'progressbar', 'aria-label': statLabel(type) + ' progress' }, [fill])
+        h('div', { class: 'progress-bar stats-type-bar', role: 'progressbar', 'aria-label': statLabel(type) }, [fill])
       ]));
       typeRefs[type] = { fill: fill, pct: pctEl, count: count };
     });
     el.screen.appendChild(typesList);
 
     const reviewHead = h('h2', { class: 'stats-section-title stats-review-title' }, [
-      icon('flag'), h('span', { text: 'Words to review (' + stats.reviewWords.length + ')' })
+      icon('flag'), h('span', { text: T('Words to review (') + stats.reviewWords.length + ')' })
     ]);
     el.screen.appendChild(reviewHead);
     const reviewListEl = h('div', { class: 'review-list' });
@@ -839,6 +844,7 @@
     skipped: { icon: 'minus', label: 'skipped' },
     unanswered: { icon: null, label: 'not answered yet' }
   };
+  function qLabel(state) { return T(QSTATE[state].label); }
   function setMarker(host, state) {
     clear(host);
     if (QSTATE[state].icon) host.appendChild(icon(QSTATE[state].icon));
@@ -860,16 +866,16 @@
 
     const bar = h('header', { class: 'quiz-bar' }, [
       h('button', {
-        type: 'button', class: 'icon-btn quiz-close', 'aria-label': 'Cancel quiz',
+        type: 'button', class: 'icon-btn quiz-close', 'aria-label': T('Cancel quiz'),
         onclick: function () { if (confirm('Cancel this quiz? Your answers will be discarded.')) { UX.abortQuiz(); renderHome(); } }
       }, [icon('x')]),
       h('div', { class: 'quiz-heading' }, [refs.title, refs.sub]),
-      h('div', { class: 'quiz-timer', id: 'quiz-timer', role: 'timer', 'aria-label': 'Time left' }, [icon('timer'), refs.timerText]),
-      h('button', { type: 'button', class: 'icon-btn quiz-review-btn', 'aria-label': 'Review answers and finish', title: 'Review and finish', onclick: openQuizSummary }, [icon('list-checks')])
+      h('div', { class: 'quiz-timer', id: 'quiz-timer', role: 'timer', 'aria-label': T('Time left') }, [icon('timer'), refs.timerText]),
+      h('button', { type: 'button', class: 'icon-btn quiz-review-btn', 'aria-label': T('Review answers and finish'), title: T('Review and finish'), onclick: openQuizSummary }, [icon('list-checks')])
     ]);
 
     // Mobile: a strip with one numbered button per question.
-    const strip = h('nav', { class: 'quiz-numbers', 'aria-label': 'Questions' });
+    const strip = h('nav', { class: 'quiz-numbers', 'aria-label': T('Questions') });
     quiz.items.forEach(function (it) {
       const marker = h('span', { class: 'qn-marker', 'aria-hidden': 'true' });
       const b = h('button', { type: 'button', class: 'qn', onclick: function () { quizGo(it.index); } }, [h('span', { class: 'qn-num', text: String(it.index + 1) }), marker]);
@@ -878,7 +884,7 @@
     });
 
     // Desktop: a compact panel listing every question of this session.
-    const panelTitle = QE.PANEL && QE.PANEL.SHOW_ENGLISH_WORDS ? 'Quiz words' : 'Questions';
+    const panelTitle = QE.PANEL && QE.PANEL.SHOW_ENGLISH_WORDS ? T('Quiz words') : T('Questions');
     const list = h('ol', { class: 'qp-list' });
     quiz.items.forEach(function (it) {
       const marker = h('span', { class: 'qp-marker', 'aria-hidden': 'true' });
@@ -896,7 +902,7 @@
     refs.main = h('div', { class: 'quiz-main' }, [refs.stage]);
     const body = h('div', { class: 'quiz-body' }, [refs.main, panel]);
 
-    const fs = h('div', { class: 'quiz-fs', id: 'quiz-fs', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Quiz' }, [
+    const fs = h('div', { class: 'quiz-fs', id: 'quiz-fs', role: 'dialog', 'aria-modal': 'true', 'aria-label': T('Quiz') }, [
       bar, strip,
       h('div', { class: 'quiz-timebar', 'aria-hidden': 'true' }, [h('div', { class: 'quiz-timebar-fill', id: 'quiz-timebar-fill' })]),
       h('div', { class: 'visually-hidden', id: 'quiz-announce', 'aria-live': 'polite' }),
@@ -918,11 +924,11 @@
   function refreshQuizIndicators() {
     const quiz = UX.getCurrentQuiz();
     if (!quiz || !quizRefs) return;
-    quizRefs.title.textContent = quizView === 'summary' ? 'Review & finish' : 'Question ' + (quiz.index + 1) + ' of ' + quiz.total;
-    quizRefs.sub.textContent = quiz.answered + ' answered' + (quiz.skipped ? ' \u00B7 ' + quiz.skipped + ' skipped' : '');
+    quizRefs.title.textContent = quizView === 'summary' ? T('Review & finish') : T('Question {i} of {n}', { i: quiz.index + 1, n: quiz.total });
+    quizRefs.sub.textContent = quiz.answered + ' ' + T('answered') + (quiz.skipped ? ' \u00B7 ' + quiz.skipped + ' ' + T('skipped') : '');
     quiz.items.forEach(function (it) {
       const cur = quizView === 'question' && it.index === quiz.index;
-      const name = 'Question ' + (it.index + 1) + ', ' + QSTATE[it.state].label + (cur ? ', current question' : '');
+      const name = T('Question ') + (it.index + 1) + ', ' + qLabel(it.state) + (cur ? ', ' + T('current question') : '');
       [quizRefs.pills[it.index], quizRefs.rows[it.index]].forEach(function (r, k) {
         const base = k === 0 ? 'qn' : 'qp-row';
         r.el.className = base + ' ' + base + '-' + it.state + (cur ? ' ' + base + '-current' : '');
@@ -969,18 +975,18 @@
 
     const q = quiz.question;
     const input = h('input', {
-      type: 'text', class: 'quiz-input', id: 'quiz-answer', dir: 'ltr', placeholder: 'Your answer', value: q.answer || '',
+      type: 'text', class: 'quiz-input', id: 'quiz-answer', dir: 'ltr', placeholder: T('Your answer'), value: q.answer || '',
       autocomplete: 'off', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'next',
-      'aria-label': 'Your answer for question ' + (quiz.index + 1)
+      'aria-label': T('Your answer for question ') + (quiz.index + 1)
     });
     input.value = q.answer || '';
     const stateLine = h('div', { class: 'quiz-state-line', role: 'status' });
     function paintState(state) {
       clear(stateLine);
       stateLine.className = 'quiz-state-line quiz-state-' + state;
-      const text = state === 'answered' ? 'Answer saved \u2014 you can change it any time'
-        : state === 'skipped' ? 'Skipped \u2014 you can still answer it'
-        : 'Not answered yet';
+      const text = state === 'answered' ? T('Answer saved \u2014 you can change it any time')
+        : state === 'skipped' ? T('Skipped \u2014 you can still answer it')
+        : T('Not answered yet');
       if (QSTATE[state].icon) stateLine.appendChild(icon(QSTATE[state].icon));
       stateLine.appendChild(h('span', { text: text }));
     }
@@ -989,7 +995,7 @@
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); quizNext(); } });
 
     const last = quiz.index >= quiz.total - 1;
-    const prevBtn = h('button', { type: 'button', class: 'btn btn-secondary quiz-nav-btn', 'aria-label': 'Previous question', onclick: quizPrev }, [icon('arrow-left'), h('span', { text: 'Previous' })]);
+    const prevBtn = h('button', { type: 'button', class: 'btn btn-secondary quiz-nav-btn', 'aria-label': T('Previous question'), onclick: quizPrev }, [icon('arrow-left'), h('span', { text: T('Previous') })]);
     prevBtn.disabled = quiz.index === 0;
     const nextBtn = h('button', { type: 'button', class: 'btn btn-primary quiz-nav-btn', 'aria-label': last ? 'Review answers and finish' : 'Next question', onclick: quizNext }, [
       h('span', { text: last ? 'Review & finish' : 'Next' }), icon(last ? 'list-checks' : 'arrow-right')
@@ -997,7 +1003,7 @@
 
     quizRefs.stage.appendChild(h('section', { class: 'quiz-stage' }, [
       h('div', { class: 'card quiz-card quiz-enter' }, [
-        h('div', { class: 'quiz-card-label', text: 'Type the English word' }),
+        h('div', { class: 'quiz-card-label', text: T('Type the English word') }),
         h('div', { class: 'quiz-meaning', dir: 'auto', text: q.meaning })
       ]),
       h('div', { class: 'quiz-answer' }, [input, stateLine]),
@@ -1017,29 +1023,29 @@
       ]);
     };
     const children = [
-      h('h2', { class: 'qs-heading', text: 'Ready to finish?' }),
+      h('h2', { class: 'qs-heading', text: T('Ready to finish?') }),
       h('div', { class: 'qs-tiles' }, [
-        tile('answered', quiz.answered, 'Answered'), tile('skipped', quiz.skipped, 'Skipped'), tile('unanswered', quiz.unanswered, 'Unanswered')
+        tile('answered', quiz.answered, T('Answered')), tile('skipped', quiz.skipped, T('Skipped')), tile('unanswered', quiz.unanswered, T('Unanswered'))
       ])
     ];
     if (quiz.unresolved.length) {
-      const chips = h('div', { class: 'qs-chips', role: 'group', 'aria-label': 'Questions without an answer' });
+      const chips = h('div', { class: 'qs-chips', role: 'group', 'aria-label': T('Questions without an answer') });
       quiz.unresolved.forEach(function (i) {
         const st = quiz.items[i].state;
-        chips.appendChild(h('button', { type: 'button', class: 'qn qn-' + st, 'aria-label': 'Go to question ' + (i + 1) + ', ' + QSTATE[st].label, onclick: function () { quizGo(i); } }, [
+        chips.appendChild(h('button', { type: 'button', class: 'qn qn-' + st, 'aria-label': T('Go to question ') + (i + 1) + ', ' + qLabel(st), onclick: function () { quizGo(i); } }, [
           h('span', { class: 'qn-num', text: String(i + 1) }), h('span', { class: 'qn-marker', 'aria-hidden': 'true' }, QSTATE[st].icon ? [icon(QSTATE[st].icon)] : [])
         ]));
       });
       children.push(h('div', { class: 'callout' }, [
-        h('p', { class: 'callout-text', text: plural(quiz.unresolved.length, 'question has', 'questions have') + ' no answer yet. Tap a number to go back to it. If you finish now, they count as skipped.' }),
+        h('p', { class: 'callout-text', text: T('{n} no answer yet. Tap a number to go back to it. If you finish now, they count as skipped.', { n: plural(quiz.unresolved.length, 'question has', 'questions have') }) }),
         chips
       ]));
     } else {
-      children.push(h('div', { class: 'callout callout-ok' }, [h('p', { class: 'callout-text', text: 'Every question has an answer.' })]));
+      children.push(h('div', { class: 'callout callout-ok' }, [h('p', { class: 'callout-text', text: T('Every question has an answer.') })]));
     }
     children.push(h('div', { class: 'qs-actions' }, [
-      h('button', { type: 'button', class: 'btn btn-secondary quiz-nav-btn', onclick: function () { quizGo(Math.min(quiz.index, quiz.total - 1)); } }, [icon('arrow-left'), h('span', { text: 'Back to questions' })]),
-      h('button', { type: 'button', class: 'btn btn-primary quiz-nav-btn', onclick: function () { UX.finishQuiz(false); } }, [icon('circle-check'), h('span', { text: 'Finish quiz' })])
+      h('button', { type: 'button', class: 'btn btn-secondary quiz-nav-btn', onclick: function () { quizGo(Math.min(quiz.index, quiz.total - 1)); } }, [icon('arrow-left'), h('span', { text: T('Back to questions') })]),
+      h('button', { type: 'button', class: 'btn btn-primary quiz-nav-btn', onclick: function () { UX.finishQuiz(false); } }, [icon('circle-check'), h('span', { text: T('Finish quiz') })])
     ]));
     return h('section', { class: 'quiz-stage quiz-summary' }, children);
   }
@@ -1064,7 +1070,7 @@
     if (p.state !== lastTimerState) {
       lastTimerState = p.state;
       const say = document.getElementById('quiz-announce');
-      if (say && p.state !== 'normal') say.textContent = p.state === 'critical' ? 'Time is almost up.' : 'Time is running low.';
+      if (say && p.state !== 'normal') say.textContent = p.state === 'critical' ? T('Time is almost up.') : T('Time is running low.');
     }
   }
 
@@ -1073,16 +1079,16 @@
      from Quiz History — both are the same self-contained record. */
   function contextLabel(record) {
     const r = record.ref || {};
-    if (r.unit == null) return 'Vocabulary quiz';
-    return 'Unit ' + r.unit + (r.lessonKey ? ' \u00B7 Lesson ' + r.lessonKey : '');
+    if (r.unit == null) return T('Vocabulary quiz');
+    return T('Unit ') + r.unit + (r.lessonKey ? ' \u00B7 ' + T('Lesson ') + r.lessonKey : '');
   }
-  function modeLabel(record) { return (QE.MODES[record.mode] || QE.MODES.full).label; }
+  function modeLabel(record) { return T((QE.MODES[record.mode] || QE.MODES.full).label); }
   function dateLabel(ts) {
     const d = new Date(ts);
-    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) + ' \u00B7 ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString(global.I18n.locale(), { year: 'numeric', month: 'short', day: 'numeric' }) + ' \u00B7 ' + d.toLocaleTimeString(global.I18n.locale(), { hour: '2-digit', minute: '2-digit' });
   }
   function rangeLabel(record) {
-    return record.estimatedRange ? QE.formatRange(record.estimatedRange.min, record.estimatedRange.max) : '\u2014';
+    return record.estimatedRange ? tmin(QE.formatRange(record.estimatedRange.min, record.estimatedRange.max)) : '\u2014';
   }
   function pointsText(n) { return n > 0 ? '+' + QE.formatScore(n) : '0'; }
 
@@ -1091,18 +1097,18 @@
 
     // 1) The result, at a glance.
     const hero = h('section', { class: 'card result-hero' }, [
-      h('div', { class: 'result-hero-label', text: 'Score' }),
-      h('div', { class: 'result-score', 'aria-label': 'Score ' + QE.formatScore(record.score) + ' out of ' + QE.formatScore(record.maxScore) }, [
+      h('div', { class: 'result-hero-label', text: T('Score') }),
+      h('div', { class: 'result-score', 'aria-label': T('Score ') + QE.formatScore(record.score) + ' / ' + QE.formatScore(record.maxScore) }, [
         h('span', { class: 'result-score-value', text: QE.formatScore(record.score) }),
         h('span', { class: 'result-score-max', text: ' / ' + QE.formatScore(record.maxScore) })
       ]),
       h('div', { class: 'result-percent' }, [
-        h('span', { class: 'result-percent-label', text: 'Percentage' }),
+        h('span', { class: 'result-percent-label', text: T('Percentage') }),
         h('span', { class: 'result-percent-value', text: QE.formatPercent(record.percentage) })
       ]),
       h('div', { class: 'result-bar', 'aria-hidden': 'true' }, [h('div', { class: 'result-bar-fill', style: 'width:' + Math.max(0, Math.min(100, record.percentage)) + '%' })])
     ]);
-    if (record.timedOut) hero.appendChild(h('div', { class: 'result-timedout' }, [icon('clock'), h('span', { text: 'Time ran out' })]));
+    if (record.timedOut) hero.appendChild(h('div', { class: 'result-timedout' }, [icon('clock'), h('span', { text: T('Time ran out') })]));
     view.appendChild(hero);
 
     // 2) Four compact categories.
@@ -1110,7 +1116,7 @@
     QE.CATEGORIES.forEach(function (c) {
       cats.appendChild(h('div', { class: 'result-cat result-cat-' + c }, [
         h('span', { class: 'result-cat-icon' }, [icon(RESULT_ICONS[c])]),
-        h('span', { class: 'result-cat-label', text: QE.LABELS[c] }),
+        h('span', { class: 'result-cat-label', text: T(QE.LABELS[c]) }),
         h('span', { class: 'result-cat-value', text: String(record[c]) })
       ]));
     });
@@ -1131,7 +1137,7 @@
       }
     }, [
       icon('list-checks', 'details-toggle-icon'),
-      h('span', { class: 'details-toggle-label', text: 'Advanced Details' }),
+      h('span', { class: 'details-toggle-label', text: T('Advanced Details') }),
       icon('chevron-down', 'details-chevron')
     ]);
     view.appendChild(toggle);
@@ -1142,17 +1148,17 @@
   function buildDetails(panel, record) {
     const answered = record.correct + record.near + record.wrong; // skipped questions are not "answered"
     const stats = [
-      ['Exact score', QE.formatScore(record.score)],
-      ['Maximum score', QE.formatScore(record.maxScore)],
-      ['Percentage', QE.formatPercent(record.percentage)],
-      ['Accuracy (answered)', answered > 0 ? QE.formatPercent((record.score / answered) * 100) : '\u2014'],
-      ['Correct', String(record.correct)],
-      ['Near Miss', String(record.near)],
-      ['Wrong', String(record.wrong)],
-      ['Skipped', String(record.skipped)],
-      ['Time spent', record.durationSeconds != null ? QE.formatClock(record.durationSeconds) : '\u2014'],
-      ['Estimated time', rangeLabel(record)],
-      ['Time limit', record.timeLimit != null ? QE.formatClock(record.timeLimit) : '\u2014']
+      [T('Exact score'), QE.formatScore(record.score)],
+      [T('Maximum score'), QE.formatScore(record.maxScore)],
+      [T('Percentage'), QE.formatPercent(record.percentage)],
+      [T('Accuracy (answered)'), answered > 0 ? QE.formatPercent((record.score / answered) * 100) : '\u2014'],
+      [T('Correct'), String(record.correct)],
+      [T('Near Miss'), String(record.near)],
+      [T('Wrong'), String(record.wrong)],
+      [T('Skipped'), String(record.skipped)],
+      [T('Time spent'), record.durationSeconds != null ? QE.formatClock(record.durationSeconds) : '\u2014'],
+      [T('Estimated time'), rangeLabel(record)],
+      [T('Time limit'), record.timeLimit != null ? QE.formatClock(record.timeLimit) : '\u2014']
     ];
     const dl = h('dl', { class: 'details-grid' });
     stats.forEach(function (r) {
@@ -1160,29 +1166,29 @@
     });
     panel.appendChild(dl);
 
-    panel.appendChild(h('h3', { class: 'details-subtitle', text: 'Question breakdown' }));
+    panel.appendChild(h('h3', { class: 'details-subtitle', text: T('Question breakdown') }));
     if (!record.answers.length) {
-      panel.appendChild(h('p', { class: 'empty-note', text: 'Question details were not saved for this quiz.' }));
+      panel.appendChild(h('p', { class: 'empty-note', text: T('Question details were not saved for this quiz.') }));
       return;
     }
-    const filters = h('div', { class: 'details-filters', role: 'group', 'aria-label': 'Filter questions' });
+    const filters = h('div', { class: 'details-filters', role: 'group', 'aria-label': T('Filter questions') });
     const list = h('div', { class: 'qd-list' });
     let active = 'all';
-    const defs = [{ key: 'all', label: 'All', n: record.answers.length }].concat(QE.CATEGORIES.map(function (c) {
-      return { key: c, label: QE.LABELS[c], n: record[c] };
+    const defs = [{ key: 'all', label: T('All'), n: record.answers.length }].concat(QE.CATEGORIES.map(function (c) {
+      return { key: c, label: T(QE.LABELS[c]), n: record[c] };
     }));
     function drawList() {
       clear(list);
       const rows = record.answers.filter(function (a) { return active === 'all' || a.result === active; });
-      if (!rows.length) { list.appendChild(h('p', { class: 'empty-note', text: 'Nothing here.' })); return; }
+      if (!rows.length) { list.appendChild(h('p', { class: 'empty-note', text: T('Nothing here.') })); return; }
       rows.forEach(function (a) {
         const main = [
           h('span', { class: 'qd-expected', text: a.expected }),
           h('span', { class: 'qd-prompt', dir: 'auto', text: a.prompt })
         ];
-        if (a.userAnswer && a.result !== 'correct') main.push(h('span', { class: 'qd-yours' }, [h('span', { class: 'text-muted', text: 'You wrote: ' }), a.userAnswer]));
+        if (a.userAnswer && a.result !== 'correct') main.push(h('span', { class: 'qd-yours' }, [h('span', { class: 'text-muted', text: T('You wrote: ') }), a.userAnswer]));
         list.appendChild(h('div', { class: 'qd-row qd-' + a.result }, [
-          h('span', { class: 'qd-badge', title: QE.LABELS[a.result], 'aria-label': QE.LABELS[a.result] }, [icon(RESULT_ICONS[a.result])]),
+          h('span', { class: 'qd-badge', title: T(QE.LABELS[a.result]), 'aria-label': T(QE.LABELS[a.result]) }, [icon(RESULT_ICONS[a.result])]),
           h('div', { class: 'qd-main' }, main),
           h('span', { class: 'qd-points', text: pointsText(a.score) })
         ]));
@@ -1211,18 +1217,18 @@
   }
 
   function renderQuizFinished(record) {
-    route = { screen: 'quiz-result' };
+    route = { screen: 'quiz-result', record: record };
     clear(el.screen);
     el.screen.appendChild(h('header', { class: 'app-header' }, [
       h('div', {}, [
-        h('h1', { class: 'title-lg', text: 'Quiz results' }),
+        h('h1', { class: 'title-lg', text: T('Quiz results') }),
         h('p', { class: 'text-muted', text: modeLabel(record) + ' \u00B7 ' + contextLabel(record) })
       ])
     ]));
     el.screen.appendChild(renderQuizResultView(record));
     el.screen.appendChild(h('div', { class: 'result-actions' }, [
-      h('button', { class: 'btn btn-primary', onclick: renderHome }, [icon('house'), h('span', { text: 'Back to home' })]),
-      h('button', { class: 'btn btn-secondary', onclick: renderHistory }, [icon('history'), h('span', { text: 'Quiz History' })])
+      h('button', { class: 'btn btn-primary', onclick: renderHome }, [icon('house'), h('span', { text: T('Back to home') })]),
+      h('button', { class: 'btn btn-secondary', onclick: renderHistory }, [icon('history'), h('span', { text: T('Quiz History') })])
     ]));
     showNav('home');
   }
@@ -1231,11 +1237,11 @@
   function renderHistoryItem(rec) {
     const counts = h('div', { class: 'qh-counts' });
     QE.CATEGORIES.forEach(function (c) {
-      counts.appendChild(h('span', { class: 'qh-count qh-count-' + c, title: QE.LABELS[c] + ': ' + rec[c], 'aria-label': QE.LABELS[c] + ' ' + rec[c] }, [icon(RESULT_ICONS[c]), h('span', { text: String(rec[c]) })]));
+      counts.appendChild(h('span', { class: 'qh-count qh-count-' + c, title: T(QE.LABELS[c]) + ': ' + rec[c], 'aria-label': T(QE.LABELS[c]) + ' ' + rec[c] }, [icon(RESULT_ICONS[c]), h('span', { text: String(rec[c]) })]));
     });
     return h('button', {
       type: 'button', class: 'qh-item',
-      'aria-label': modeLabel(rec) + ', ' + contextLabel(rec) + ', score ' + QE.formatScore(rec.score) + ' of ' + QE.formatScore(rec.maxScore),
+      'aria-label': modeLabel(rec) + ', ' + contextLabel(rec) + ', ' + T('Score ') + QE.formatScore(rec.score) + ' / ' + QE.formatScore(rec.maxScore),
       onclick: function () { renderQuizDetail(rec.id); }
     }, [
       h('div', { class: 'qh-top' }, [
@@ -1264,15 +1270,15 @@
     clear(el.screen);
     el.screen.appendChild(h('header', { class: 'app-header' }, [
       h('div', {}, [
-        h('h1', { class: 'title-lg', text: 'Quiz History' }),
-        h('p', { class: 'text-muted', text: 'Your last 40 quizzes, newest first' })
+        h('h1', { class: 'title-lg', text: T('Quiz History') }),
+        h('p', { class: 'text-muted', text: T('Your last 40 quizzes, newest first') })
       ])
     ]));
     const records = UX.getQuizHistory().reverse();
     if (!records.length) {
       el.screen.appendChild(h('div', { class: 'card history-empty' }, [
         icon('history', 'history-empty-icon'),
-        h('p', { class: 'empty-note', text: 'No quizzes yet. Finish a quiz and it will appear here.' })
+        h('p', { class: 'empty-note', text: T('No quizzes yet. Finish a quiz and it will appear here.') })
       ]));
     } else {
       const list = h('div', { class: 'quiz-history-list' });
@@ -1286,10 +1292,10 @@
   function renderQuizDetail(recordId) {
     const record = UX.getQuizRecord(recordId);
     if (!record) { renderHistory(); return; }
-    route = { screen: 'quiz-detail' };
+    route = { screen: 'quiz-detail', recordId: recordId };
     clear(el.screen);
     el.screen.appendChild(h('header', { class: 'app-header' }, [
-      h('button', { class: 'icon-btn back-btn', 'aria-label': 'Back to Quiz History', onclick: renderHistory }, [icon('arrow-left')]),
+      h('button', { class: 'icon-btn back-btn', 'aria-label': T('Back to Quiz History'), onclick: renderHistory }, [icon('arrow-left')]),
       h('div', {}, [
         h('h1', { class: 'title-lg', text: modeLabel(record) }),
         h('p', { class: 'text-muted', text: contextLabel(record) + ' \u00B7 ' + dateLabel(record.ts) })
@@ -1376,15 +1382,15 @@
     // rectangles (not dots), four colors, no meanings attached to them.
     const swatches = h('ul', { class: 'hl-legend-list' });
     [['yellow', 'Yellow'], ['green', 'Green'], ['purple', 'Purple'], ['pink', 'Pink']].forEach(function (c) {
-      swatches.appendChild(h('li', {}, [h('span', { class: 'hl hl-' + c[0] + ' hl-swatch', text: c[1] })]));
+      swatches.appendChild(h('li', {}, [h('span', { class: 'hl hl-' + c[0] + ' hl-swatch', text: T(c[1]) })]));
     });
     const legend = h('div', { class: 'hl-legend' }, [
-      h('h3', { class: 'hl-legend-title', text: 'Highlighter colors' }),
+      h('h3', { class: 'hl-legend-title', text: T('Highlighter colors') }),
       swatches,
       h('p', { class: 'hl-note', dir: 'rtl', lang: 'ar', text: HL_NOTE })
     ]);
-    return h('section', { class: 'card info-card study-card', 'aria-label': 'Study method' }, [
-      h('h2', { class: 'info-card-title', text: 'Study method' }),
+    return h('section', { class: 'card info-card study-card', 'aria-label': T('Study method') }, [
+      h('h2', { class: 'info-card-title', text: T('Study method') }),
       body,
       legend
     ]);
@@ -1394,32 +1400,34 @@
     route = { screen: 'info' };
     clear(el.screen);
     const page = h('div', { class: 'info-page' });
-    page.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: 'Info' })]));
+    page.appendChild(h('header', { class: 'app-header' }, [h('h1', { class: 'title-lg', text: T('Info') })]));
 
     const card = h('section', { class: 'card info-card' });
-    card.appendChild(h('h2', { class: 'info-card-title', text: 'Parts of speech' }));
-    card.appendChild(h('p', { class: 'text-muted info-card-intro', text: 'Every word has a tag such as n. or v. next to it. It tells you what job the word does in a sentence. Each tag has its own color.' }));
+    card.appendChild(h('h2', { class: 'info-card-title', text: T('Parts of speech') }));
+    card.appendChild(h('p', { class: 'text-muted info-card-intro', text: T('Every word has a tag such as n. or v. next to it. It tells you what job the word does in a sentence. Each tag has its own color.') }));
     const list = h('ul', { class: 'pos-list' });
     POS_INFO.forEach(function (p) {
       const cat = p.tag === 'other' ? 'other' : posCategory(p.tag);
       const body = [
-        h('div', { class: 'pos-item-name', text: p.name }),
-        h('p', { class: 'pos-item-text', text: p.text })
+        h('div', { class: 'pos-item-name', text: T(p.name) }),
+        h('p', { class: 'pos-item-text', text: T(p.text) })
       ];
-      if (p.example) body.push(h('p', { class: 'pos-item-example' }, [h('span', { class: 'text-muted', text: 'Examples: ' }), p.example]));
+      if (p.example) body.push(h('p', { class: 'pos-item-example' }, [h('span', { class: 'text-muted', text: T('Examples: ') }), p.example]));
       list.appendChild(h('li', { class: 'pos-item' }, [
-        h('span', { class: 'pos-badge pos-' + cat + ' pos-badge-lg', text: p.tag === 'other' ? 'Other' : p.tag.charAt(0).toUpperCase() + p.tag.slice(1) }),
+        h('span', { class: 'pos-badge pos-' + cat + ' pos-badge-lg', text: p.tag === 'other' ? T('Other') : p.tag.charAt(0).toUpperCase() + p.tag.slice(1) }),
         h('div', { class: 'pos-item-body' }, body)
       ]));
     });
     card.appendChild(list);
-    card.appendChild(h('p', { class: 'text-muted pos-note', text: 'Some words have two tags separated by a slash, such as n./v. That means the word can work as either one.' }));
-    page.appendChild(renderStudyMethod());   // 1) Study Method
-    page.appendChild(card);                  // 2) Parts of Speech
+    card.appendChild(h('p', { class: 'text-muted pos-note', text: T('Some words have two tags separated by a slash, such as n./v. That means the word can work as either one.') }));
+    // Version, changelog and the purpose of the site live in JavaScript/pages.js.
+    if (global.UI && global.UI.buildAbout) page.appendChild(global.UI.buildAbout());
+    page.appendChild(renderStudyMethod());   // Study Method
+    page.appendChild(card);                  // Parts of Speech
 
     page.appendChild(h('footer', { class: 'info-footer' }, [
-      h('p', { class: 'info-credit', text: 'Created by Mouhammed & Anas' }),
-      h('p', { class: 'info-copyright', text: '\u00A9 2026 e.english. All rights reserved.' })
+      h('p', { class: 'info-credit', text: T('Created by Mouhammed & Anas') }),
+      h('p', { class: 'info-copyright', text: T('\u00A9 2026 e.english. All rights reserved.') })
     ]));
     el.screen.appendChild(page);
     showNav('info');
@@ -1436,6 +1444,7 @@
     el.nav = document.getElementById('bottom-nav');
     el.sideNav = document.getElementById('side-nav');
     el.themeBtn = document.getElementById('theme-toggle-btn');
+    el.langBtn = document.getElementById('lang-toggle-btn');
 
     wireNav(el.nav);
     wireNav(el.sideNav);
@@ -1446,12 +1455,15 @@
     // whenever the OS/browser theme flips — no reload needed.
     applyTheme(UX.getTheme());
     applyThemeColor(UX.getThemeColor());
+    document.documentElement.setAttribute('lang', UX.getLanguage());
+    document.documentElement.setAttribute('dir', UX.getLanguage() === 'ar' ? 'rtl' : 'ltr');
     if (el.themeBtn) {
       el.themeBtn.addEventListener('click', function () {
         const pref = UX.getThemePreference();
         UX.setTheme(THEME_CYCLE[(THEME_CYCLE.indexOf(pref) + 1) % THEME_CYCLE.length]);
       });
     }
+    if (el.langBtn) el.langBtn.addEventListener('click', function () { UX.setLanguage(UX.getLanguage() === 'ar' ? 'en' : 'ar'); });
     UX.on('theme-preference-changed', syncThemeButton);
     UX.on('theme-changed', applyTheme);
     UX.on('theme-color-changed', applyThemeColor);
@@ -1478,6 +1490,45 @@
       else if (route.screen === 'history') renderHistory();
       else if (route.screen === 'unit') renderUnit(route.unit);
     }
+    // Language switch: translate the fixed labels, then redraw the open screen from
+    // the same state (a running quiz is never redrawn — the switcher is hidden then).
+    function applyLanguage() {
+      const lang = UX.getLanguage();
+      document.documentElement.setAttribute('lang', lang);
+      document.documentElement.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+      eachNav(function (n) {
+        n.querySelectorAll('.nav-btn').forEach(function (b) {
+          const sp = b.querySelector('span');
+          if (!sp) return;
+          if (!sp.dataset.en) sp.dataset.en = sp.textContent;
+          sp.textContent = T(sp.dataset.en);
+          b.setAttribute('aria-label', T(b.dataset.nav === 'history' ? 'Quiz History' : sp.dataset.en));
+        });
+      });
+      syncThemeButton();
+      syncLangButton();
+    }
+    function syncLangButton() {
+      if (!el.langBtn) return;
+      const lang = UX.getLanguage();
+      el.langBtn.textContent = lang === 'ar' ? 'EN' : '\u0639';
+      el.langBtn.setAttribute('lang', lang === 'ar' ? 'en' : 'ar');
+      el.langBtn.setAttribute('title', lang === 'ar' ? 'English' : '\u0627\u0644\u0639\u0631\u0628\u064A\u0629');
+      el.langBtn.setAttribute('aria-label', lang === 'ar' ? 'Switch to English' : '\u0627\u0644\u062A\u0628\u062F\u064A\u0644 \u0625\u0644\u0649 \u0627\u0644\u0639\u0631\u0628\u064A\u0629');
+    }
+    function rerenderForLanguage() {
+      applyLanguage();
+      const r = route;
+      if (r.screen === 'settings' && global.UI.renderSettings) global.UI.renderSettings({ keepAdvanced: true });
+      else if (r.screen === 'info') renderInfo();
+      else if (r.screen === 'readme' && global.UI.renderReadme) global.UI.renderReadme();
+      else if (r.screen === 'feedback' && global.UI.renderFeedback) global.UI.renderFeedback();
+      else if (r.screen === 'quiz-result' && r.record) renderQuizFinished(r.record);
+      else if (r.screen === 'quiz-detail' && r.recordId) renderQuizDetail(r.recordId);
+      else if (r.screen === 'quiz') { /* never redrawn mid-quiz */ }
+      else rerenderCurrent();
+    }
+    UX.on('language-changed', rerenderForLanguage);
     UX.on('data-imported', rerenderCurrent);
     UX.on('data-reset', rerenderCurrent);
 
@@ -1487,6 +1538,7 @@
     UX.on('quiz-finished', renderQuizFinished);
     UX.on('search-results', renderSearchResults);
 
+    applyLanguage();
     renderSkeleton();
     UX.loadAll();
     // Notice a different model version on the server (newer OR older) and
