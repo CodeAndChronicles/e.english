@@ -13,7 +13,7 @@ html, body {
   font-weight: var(--fw-body); /* normal text; headings use --fw-head (see root.css font system) */
   color: var(--color-text);
   background: var(--color-bg);
-  direction: ltr;
+  /* direction comes from <html dir="ltr|rtl"> (set by ui.js from the chosen language) */
 }
 /* Headings follow the heading role; form controls follow the body role. */
 h1, h2, h3, h4, h5, h6 { font-weight: var(--fw-head); }
@@ -42,8 +42,8 @@ button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
 #app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 #screen-container {
   flex: 1;
-  padding: var(--sp-md);
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--sp-lg));
+  padding: var(--sp-sm) var(--sp-sm) 0;
+  padding-bottom: calc(var(--nav-height) + var(--nav-gap) + env(safe-area-inset-bottom, 0px) + var(--sp-md));
   max-width: var(--content-max-width);
   width: 100%;
   margin: 0 auto;
@@ -60,7 +60,9 @@ button[disabled], .is-disabled { cursor: not-allowed; opacity: 0.5; }
 /* ---------- App header ---------- */
 .app-header {
   display: flex; align-items: center; gap: var(--sp-sm);
-  min-height: 56px; margin-bottom: var(--sp-lg);
+  min-height: 48px; margin-bottom: var(--sp-md);
+  /* keep the title clear of the two floating buttons (language + theme) */
+  padding-inline-end: calc(2 * 44px + var(--sp-md));
 }
 .app-logo { height: 38px; width: auto; border-radius: var(--r-sm); flex-shrink: 0; }
 .icon-btn {
@@ -140,12 +142,12 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .unit-progress-pct { flex-shrink: 0; min-width: 3.4ch; text-align: end; font-size: var(--font-size-sm); font-weight: var(--fw-head); font-variant-numeric: tabular-nums; color: var(--color-text); }
 
 /* ---------- Section cards (Vocabulary / Idioms / Synonyms & Antonyms) ---------- */
-.sections-wrap { display: flex; flex-direction: column; gap: var(--sp-lg); margin-bottom: var(--sp-lg); }
+.sections-wrap { display: flex; flex-direction: column; gap: var(--sp-md); margin-bottom: var(--sp-md); }
 .section-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--r-lg);
-  padding: var(--sp-lg);
+  padding: var(--sp-md);
   box-shadow: var(--shadow-sm);
 }
 .section-card-head { display: flex; align-items: center; gap: var(--sp-sm); margin-bottom: var(--sp-md); }
@@ -365,7 +367,7 @@ button.result-row:hover { background: var(--color-surface-alt); border-color: va
 .flag-btn.active { color: var(--color-review); background: var(--color-review-bg); }
 
 /* ---------- Shared card ---------- */
-.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--r-lg); padding: var(--sp-lg); box-shadow: var(--shadow-sm); }
+.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--r-lg); padding: var(--sp-md); box-shadow: var(--shadow-sm); }
 
 /* ---------- Quiz launch buttons (inside a lesson's Vocabulary section) ---------- */
 .quiz-launch { height: auto; min-height: 56px; padding: var(--sp-sm) var(--sp-md); justify-content: flex-start; text-align: start; gap: var(--sp-sm); }
@@ -712,14 +714,19 @@ body.quiz-active .theme-toggle-btn { display: none; }
    Fixed height + safe-area padding so it never overlaps a phone's home
    indicator / gesture bar, and never looks cramped on a wide screen. */
 .bottom-nav {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  height: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  display: flex;
+  /* Floating, rounded bar: it sits above the safe area with a small gap, so it
+     never touches the screen edge or the phone's gesture bar. */
+  position: fixed; left: 0; right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--nav-gap));
+  width: calc(100% - var(--sp-md));
+  height: var(--nav-height);
+  padding: 4px;
+  display: flex; gap: 2px;
   background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-lg);
   box-shadow: var(--shadow-md);
-  max-width: var(--content-max-width);
+  max-width: min(var(--content-max-width), 720px);
   margin: 0 auto;
   z-index: 100;
 }
@@ -731,8 +738,14 @@ body.quiz-active .theme-toggle-btn { display: none; }
 /* Six tabs on a phone: keep every label on one line inside its slot. */
 .nav-btn { min-width: 0; padding-inline: 2px; }
 .nav-btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 359px) { .nav-btn { font-size: 10px; } .nav-btn .icon { font-size: 20px; } }
+@media (max-width: 359px) { .nav-btn { font-size: 9.5px; letter-spacing: -0.2px; } .nav-btn .icon { font-size: 18px; } }
 .nav-btn.active { color: var(--color-ink); }
+.bottom-nav .nav-btn { border-radius: var(--r-md); }
+.bottom-nav .nav-btn:hover { background: var(--color-surface-alt); }
+.bottom-nav .nav-btn.active { background: var(--color-mint); font-weight: var(--fw-medium); }
+.nav-btn:focus-visible { outline: 2px solid var(--color-ink); outline-offset: -2px; }
+/* Seven tabs: labels shrink a little on narrow phones, never wrap or overflow. */
+@media (max-width: 419px) { .bottom-nav { padding: 3px; gap: 0; } .nav-btn { font-size: 9.5px; padding-inline: 0; } .nav-btn .icon { font-size: 20px; } }
 
 /* ---------- Side nav (large screens — replaces the bottom nav so wide
    screens use a proper app-shell layout instead of a stretched phone
@@ -774,13 +787,14 @@ body.quiz-active .theme-toggle-btn { display: none; }
 /* ================= Responsive breakpoints ================= */
 @media (min-width: 640px) {
   /* keep the bottom-nav clearance — the shorthand alone would drop it */
-  #screen-container { padding: var(--sp-lg); padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + var(--sp-lg)); }
+  :root { --content-max-width: 880px; }
+  #screen-container { padding: var(--sp-md) var(--sp-md) 0; padding-bottom: calc(var(--nav-height) + var(--nav-gap) + env(safe-area-inset-bottom, 0px) + var(--sp-md)); }
   .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-md); }
   .stats-types { display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--sp-xl); }
   .stats-type:nth-last-child(2):nth-child(odd) { border-bottom: none; }
 }
 @media (min-width: 1024px) {
-  :root { --content-max-width: 1000px; }
+  :root { --content-max-width: 1120px; }
 
   /* App-shell layout: side rail instead of the phone's bottom nav — the
      rail is fixed to the edge, and #app reserves that width so the
@@ -788,7 +802,7 @@ body.quiz-active .theme-toggle-btn { display: none; }
   .bottom-nav { display: none; }
   .side-nav { display: flex; }
   #app { padding-inline-start: var(--side-nav-width); }
-  #screen-container { padding: var(--sp-xl) var(--sp-xl); padding-bottom: var(--sp-xl); }
+  #screen-container { padding: var(--sp-lg) var(--sp-lg); padding-bottom: var(--sp-lg); }
 
   .card-grid { grid-template-columns: 1fr 1fr 1fr; }
   /* Sections stack full width; the GROUP grid lives inside each section. */
@@ -801,7 +815,7 @@ body.quiz-active .theme-toggle-btn { display: none; }
   .review-list, .quiz-history-list { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-sm); }
 }
 @media (min-width: 1280px) {
-  :root { --content-max-width: 1180px; }
+  :root { --content-max-width: 1320px; }
   .card-grid { grid-template-columns: repeat(4, 1fr); }
 }
 @media (max-width: 479px) {
@@ -960,3 +974,71 @@ body.quiz-active .theme-toggle-btn { display: none; }
 .group .group-body .word-card-study .word-card-head { display: flex; }
 .group .group-body .word-card-study .flag-label { display: inline; }
 .group .group-body .word-card-study .flag-btn { min-width: 44px; min-height: 44px; padding: 0 var(--sp-sm); }
+
+
+/* ======================================================================
+   Language: right-to-left layout (<html dir="rtl"> when Arabic is chosen)
+   Most rules above already use logical properties (inline-start/end), so
+   the layout mirrors itself. These few rules fix what cannot mirror alone:
+   direction arrows, and the language/theme floating buttons.
+   ====================================================================== */
+.lang-toggle-btn { inset-inline-end: calc(var(--sp-md) + 44px + var(--sp-xs)); font-size: 14px; font-weight: var(--fw-bold); font-family: var(--font-main); line-height: 1; }
+[dir="rtl"] .nav-card-chevron,
+[dir="rtl"] .qh-chevron,
+[dir="rtl"] .back-btn .icon,
+[dir="rtl"] .quiz-nav-btn > .icon,
+[dir="rtl"] .group-chevron { transform: scaleX(-1); }
+[dir="rtl"] .qh-chevron { transform: translateY(-50%) scaleX(-1); }
+[dir="rtl"] .group.open .group-chevron { transform: rotate(90deg); }
+[dir="rtl"] .word-meaning, [dir="rtl"] .result-meaning { text-align: start; }
+[dir="rtl"] .md-body { text-align: start; }
+/* English content stays left-to-right inside an Arabic page. */
+.word-text, .quiz-input, .qd-expected, .qd-yours, .answer-you-wrote { unicode-bidi: isolate; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-btn, .theme-toggle-btn, .nav-card, .search-box { transition: none !important; }
+}
+
+
+/* ======================================================================
+   Read Me, Feedback and Info (About) — same cards and tokens as the rest.
+   ====================================================================== */
+.readme-wrap { display: flex; flex-direction: column; gap: var(--sp-sm); }
+.readme-hero { padding: var(--sp-md); }
+.readme-hero .md-h1 { font-size: var(--font-size-xl); border-bottom: none; padding-bottom: 0; margin-bottom: var(--sp-xs); }
+.readme-toc { display: flex; flex-wrap: wrap; gap: var(--sp-xs); }
+.readme-chip { display: inline-flex; align-items: center; min-height: 36px; padding: 4px var(--sp-sm); border-radius: var(--r-pill); background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-ink); font-size: var(--font-size-sm); text-decoration: none; }
+.readme-chip:hover { background: var(--color-mint); }
+.readme-chip:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
+.readme-sections { display: grid; gap: var(--sp-sm); grid-template-columns: minmax(0, 1fr); align-items: start; }
+.readme-section { padding: var(--sp-md); min-width: 0; }
+.readme-section .md-h2 { margin: 0 0 var(--sp-sm); font-size: var(--font-size-lg); border-bottom: 1px solid var(--color-border); padding-bottom: var(--sp-xs); }
+.readme-section .md-body, .readme-hero .md-body { max-width: none; }
+.readme-section > :last-child, .readme-hero > :last-child { margin-bottom: 0; }
+.readme-section .md-h3 { margin-top: var(--sp-md); }
+@media (min-width: 1100px) { .readme-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.feedback-page { display: flex; flex-direction: column; gap: var(--sp-sm); }
+.fb-contact { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-xs); }
+.fb-contact-icon { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: var(--r-md); background: var(--color-mint); color: var(--color-ink); }
+.fb-lead { margin: 0; line-height: 1.6; }
+.fb-wa-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-xs); min-height: 52px; padding-inline: var(--sp-lg); text-decoration: none; font-weight: var(--fw-bold); margin-top: var(--sp-xs); max-width: 100%; }
+.fb-wa-btn:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 3px; }
+.fb-username { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-xs); }
+.fb-username-text { font-family: var(--font-en); direction: ltr; unicode-bidi: isolate; padding: 2px 10px; border-radius: var(--r-pill); background: var(--color-mint); color: var(--color-ink); }
+.fb-note { margin: 0; line-height: 1.5; }
+.fb-grid { display: grid; gap: var(--sp-sm); grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 760px) { .fb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-sm); }
+.fb-item { display: flex; gap: var(--sp-sm); align-items: flex-start; }
+.fb-item-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--r-md); background: var(--color-mint); color: var(--color-ink); flex-shrink: 0; }
+.fb-item-title { font-weight: var(--fw-bold); }
+.fb-steps { margin: 0; padding-inline-start: var(--sp-lg); display: flex; flex-direction: column; gap: var(--sp-xs); line-height: 1.55; }
+
+.about-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-xs); margin-bottom: var(--sp-xs); }
+.about-head .info-card-title { margin: 0; }
+.version-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: var(--r-pill); background: var(--color-mint); color: var(--color-ink); font-weight: var(--fw-bold); font-size: var(--font-size-sm); }
+.version-chip .icon { font-size: 16px; }
+.about-purpose { margin: 0 0 var(--sp-sm); line-height: 1.7; }
+.about-sub { margin: 0 0 var(--sp-xs); font-size: var(--font-size-md); }
+.changelog { margin: 0; padding-inline-start: var(--sp-lg); display: flex; flex-direction: column; gap: 6px; line-height: 1.55; }

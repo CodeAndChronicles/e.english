@@ -4,11 +4,13 @@
      1. BASE / SEMANTIC tokens (this file, top): neutral Carbon-style greys,
         success / review / danger, per-section "tone" hues and one color per
         part of speech. The DEFAULT look is calm and cool: one clear primary
-        (a soft azure) for actions, active states and progress, neutral cool
+        (a neutral graphite) for actions, active states and progress, neutral cool
         greys for everything else, and secondary hues used ONLY where they tell
         things apart (the four content types, parts of speech).
-     2. ACCENT palettes (bottom): 8 muted, Carbon-inspired palettes chosen in
-        Settings. Picking one sets <html data-color="…">, which re-points the
+     2. ACCENT palettes (bottom): 6 palettes + the neutral Default = 7 choices in
+        Settings (Burgundy, Lavender, Sky Blue, Lime, Orange, Teal — six different
+        hues). Palettes offered by earlier versions are kept at the very bottom so a
+        saved choice never changes behind the person's back. Picking one sets <html data-color="…">, which re-points the
         accent tokens AND every "tone" token at that palette, so the whole
         UI adopts one unified accent. Success / review / danger and part-of-
         speech colors are NOT touched — they keep their meaning. */
@@ -79,8 +81,9 @@
 
   /* ---- Layout ---- */
   --nav-height: 64px;
+  --nav-gap: 8px;           /* the floating bottom bar's distance from the screen edge */
   --content-max-width: 720px;
-  --side-nav-width: 148px;
+  --side-nav-width: 172px;
 
   /* ---- Motion ---- */
   --t-fast: 0.14s;
@@ -105,13 +108,13 @@
   --color-text-muted: #5B6674;
   --color-disabled: #AEB6C1;
 
-  /* Default primary: a calm azure. White on it = 5.6:1; as text on white = 5.6:1. */
-  --color-primary: #2C6BA8;
-  --color-primary-hover: #235A91;
+  /* Default primary: neutral graphite. White on it = 9.0:1; as text on white = 9.0:1. */
+  --color-primary: #3F4A57;
+  --color-primary-hover: #2F3944;
   --color-primary-contrast: #FFFFFF;
-  --color-ink: #2C6BA8;
-  --color-mint: #E8F0F9;
-  --color-mint-strong: #D1E2F3;
+  --color-ink: #3F4A57;
+  --color-mint: #ECEFF3;
+  --color-mint-strong: #DDE2E8;
 
   /* Semantic states (never re-pointed by an accent) */
   --color-success: #1D7A3B;
@@ -173,12 +176,12 @@
   --color-text-muted: #A2ACB8;
   --color-disabled: #565F6B;
 
-  --color-primary: #7DB3EA;
-  --color-primary-hover: #98C4F0;
-  --color-primary-contrast: #08203D;
-  --color-ink: #9CC6F0;
-  --color-mint: #182A3F;
-  --color-mint-strong: #213B58;
+  --color-primary: #C3CCD6;
+  --color-primary-hover: #D5DCE4;
+  --color-primary-contrast: #161B21;
+  --color-ink: #C3CCD6;
+  --color-mint: #262D35;
+  --color-mint-strong: #333A44;
 
   --color-success: #6FCF8A;
   --color-success-bg: #11291A;
@@ -247,7 +250,74 @@
   --tone-slate: var(--color-ink);  --tone-slate-bg: var(--color-mint);
 }
 
-/* ---- Deep palettes — rich, dark-toned accents; the fill itself is dark, so white text sits on it. ---- */
+/* ---- The six palettes (light fill carries white text; dark fill carries dark text;
+   --color-ink is the accent as text/icon on surfaces, >= 4.5:1 on its own tints). ---- */
+
+/* Burgundy */
+:root[data-color="burgundy"][data-theme="light"] {
+  --color-primary: #7A1F32; --color-primary-hover: #631828; --color-primary-contrast: #FFFFFF;
+  --color-ink: #7A1F32; --color-mint: #F8E9EC; --color-mint-strong: #F0D0D6;
+}
+:root[data-color="burgundy"][data-theme="dark"] {
+  --color-primary: #E8909F; --color-primary-hover: #EFA7B3; --color-primary-contrast: #3A0D18;
+  --color-ink: #EFA3B0; --color-mint: #3A1A21; --color-mint-strong: #522631;
+}
+
+/* Lavender */
+:root[data-color="lavender"][data-theme="light"] {
+  --color-primary: #6B4FBB; --color-primary-hover: #5A41A2; --color-primary-contrast: #FFFFFF;
+  --color-ink: #5A41A2; --color-mint: #F0ECFA; --color-mint-strong: #E0D8F4;
+}
+:root[data-color="lavender"][data-theme="dark"] {
+  --color-primary: #BBA6F0; --color-primary-hover: #CBBBF4; --color-primary-contrast: #241645;
+  --color-ink: #C4B6EA; --color-mint: #262038; --color-mint-strong: #352E52;
+}
+
+/* Sky */
+:root[data-color="sky"][data-theme="light"] {
+  --color-primary: #1E72BA; --color-primary-hover: #195F9C; --color-primary-contrast: #FFFFFF;
+  --color-ink: #195F9C; --color-mint: #E6F2FC; --color-mint-strong: #CFE4F7;
+}
+:root[data-color="sky"][data-theme="dark"] {
+  --color-primary: #7CC0F5; --color-primary-hover: #96CDF7; --color-primary-contrast: #07263F;
+  --color-ink: #9CCDF4; --color-mint: #14293B; --color-mint-strong: #1F3D57;
+}
+
+/* Lime */
+:root[data-color="lime"][data-theme="light"] {
+  --color-primary: #4D7C0F; --color-primary-hover: #3E650B; --color-primary-contrast: #FFFFFF;
+  --color-ink: #3E650B; --color-mint: #EEF6DC; --color-mint-strong: #DDEBBB;
+}
+:root[data-color="lime"][data-theme="dark"] {
+  --color-primary: #B2DB52; --color-primary-hover: #C2E574; --color-primary-contrast: #1B2A05;
+  --color-ink: #BEE06A; --color-mint: #1F2A10; --color-mint-strong: #2F4018;
+}
+
+/* Orange */
+:root[data-color="orange"][data-theme="light"] {
+  --color-primary: #B24500; --color-primary-hover: #923800; --color-primary-contrast: #FFFFFF;
+  --color-ink: #923800; --color-mint: #FDEEE0; --color-mint-strong: #F9D9BC;
+}
+:root[data-color="orange"][data-theme="dark"] {
+  --color-primary: #FFA559; --color-primary-hover: #FFB878; --color-primary-contrast: #3A1A00;
+  --color-ink: #FFB06A; --color-mint: #33210F; --color-mint-strong: #4D3318;
+}
+
+/* Teal */
+:root[data-color="teal"][data-theme="light"] {
+  --color-primary: #0B7A75; --color-primary-hover: #086661; --color-primary-contrast: #FFFFFF;
+  --color-ink: #086661; --color-mint: #E0F4F2; --color-mint-strong: #BFE6E3;
+}
+:root[data-color="teal"][data-theme="dark"] {
+  --color-primary: #4FD1C5; --color-primary-hover: #70DDD3; --color-primary-contrast: #04201E;
+  --color-ink: #6AD9CF; --color-mint: #0F2D2B; --color-mint-strong: #184240;
+}
+
+/* =====================================================================
+   Retired palettes — NOT offered in Settings any more, kept only so a choice
+   saved by an earlier version keeps looking exactly the same until the person
+   picks one of the seven. Do not remove: nothing rewrites the saved value.
+   ===================================================================== */
 
 /* Midnight */
 :root[data-color="midnight"][data-theme="light"] {
@@ -287,28 +357,6 @@
 :root[data-color="umber"][data-theme="dark"] {
   --color-primary: #D2A487; --color-primary-hover: #DDB69C; --color-primary-contrast: #2B1A10;
   --color-ink: #DBB096; --color-mint: #31241B; --color-mint-strong: #443327;
-}
-
-/* ---- Soft palettes — lighter, pastel-leaning accents; the fill is light, so it carries DARK text, and --color-ink (a deeper shade of the same hue) is what shows up as text/icons/bars. ---- */
-
-/* Sky */
-:root[data-color="sky"][data-theme="light"] {
-  --color-primary: #7FB2E5; --color-primary-hover: #6FA5DC; --color-primary-contrast: #0C2340;
-  --color-ink: #1F5FA6; --color-mint: #E9F2FB; --color-mint-strong: #D2E5F7;
-}
-:root[data-color="sky"][data-theme="dark"] {
-  --color-primary: #8FBDEB; --color-primary-hover: #A6CAF0; --color-primary-contrast: #0C2340;
-  --color-ink: #9CC5EE; --color-mint: #182A3D; --color-mint-strong: #223C56;
-}
-
-/* Lavender */
-:root[data-color="lavender"][data-theme="light"] {
-  --color-primary: #A995DC; --color-primary-hover: #9C87D3; --color-primary-contrast: #241645;
-  --color-ink: #5D45A5; --color-mint: #F0ECFA; --color-mint-strong: #E0D8F4;
-}
-:root[data-color="lavender"][data-theme="dark"] {
-  --color-primary: #B9A9E6; --color-primary-hover: #CBBEEC; --color-primary-contrast: #241645;
-  --color-ink: #C4B6EA; --color-mint: #262038; --color-mint-strong: #352E52;
 }
 
 /* Rose */
