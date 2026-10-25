@@ -20,6 +20,7 @@
 - [Local data and storage](#local-data-and-storage)
 - [Theme and customization](#theme-and-customization)
 - [Information page](#information-page)
+- [Feedback](#feedback)
 - [Automatic updates](#automatic-updates)
 - [Privacy](#privacy)
 - [Import and export](#import-and-export)
@@ -55,7 +56,9 @@ e.english is built for learners who want a calm, focused way to practise vocabul
 - **Statistics** for learning progress in each content type and overall.
 - **Quiz History**: a tab of its own with every past quiz and its details.
 - **Search** across every word and meaning.
-- **Light, Dark and System themes** (also switchable from the floating button) and a choice of eight accent palettes.
+- **Arabic and English interface** (Arabic is shown right-to-left), switched from a floating button or from Settings.
+- **Light, Dark and System themes** (also switchable from the floating button) and a choice of seven accent colors.
+- **Feedback** page to contact the developer on WhatsApp.
 - **Offline support** through a service worker.
 - **Import and export** of your progress as a JSON file.
 
@@ -249,6 +252,7 @@ Your progress is stored in your browser's `localStorage` under these keys:
 | `eenglish.quizHistory` | Your last 40 quiz results, each with a snapshot of every question. |
 | `eenglish.theme` | Light, Dark or System. |
 | `eenglish.themeColor` | Your accent palette, if you chose one. |
+| `eenglish.lang` | Your interface language (English or Arabic). |
 | `eenglish.keepAwake` | The keep-screen-awake setting. |
 | `eenglish.app` | A small marker with the app version. It is not learning data. |
 
@@ -270,17 +274,24 @@ The **floating theme button** in the corner uses the same setting. Each tap move
 
 **Accent color**
 
-- **Default** is a calm azure blue with cool grey surfaces, chosen to be easy on the eyes for long reading on a phone. One clear primary color is used for actions, the active tab and progress. Other colors appear only where they help tell things apart: the four content types (Vocabulary, Synonyms & Antonyms, Idioms & Phrasal Verbs, Derivatives) and the part-of-speech tags. Green, amber and red are kept for success, review and errors.
-- Choosing one of the eight palettes makes that color the single accent across the whole app. Success, review, error and part-of-speech colors keep their meaning.
+- **Default** is a neutral graphite with cool grey surfaces, chosen to be easy on the eyes for long reading on a phone. One calm primary color is used for actions, the active tab and progress. Other colors appear only where they help tell things apart: the four content types (Vocabulary, Synonyms & Antonyms, Idioms & Phrasal Verbs, Derivatives) and the part-of-speech tags. Green, amber and red are kept for success, review and errors.
+- Choosing one of the six palettes makes that color the single accent across the whole app. Success, review, error, the Review flag and part-of-speech colors keep their meaning.
 
-| Deep palettes | Soft palettes |
+| Choice | Hue |
 | --- | --- |
-| Midnight | Sky |
-| Plum | Lavender |
-| Petrol | Rose |
-| Umber | Sand |
+| Default | Neutral graphite |
+| Burgundy | Deep red |
+| Lavender | Purple |
+| Sky Blue | Blue |
+| Lime | Green |
+| Orange | Orange |
+| Teal | Blue-green |
 
-Every palette works in both Light and Dark mode. The browser's toolbar color follows your choice on devices that support it.
+Every palette works in both Light and Dark mode. The browser's toolbar color follows your choice on devices that support it. If an earlier version saved a palette that is no longer offered (Midnight, Plum, Petrol, Umber, Rose or Sand), it keeps working and is replaced only when you choose one of the seven.
+
+**Language**
+
+Choose **العربية** or **English** in Settings, or tap the small language button next to the theme button. The whole interface changes, including the direction of the layout (right-to-left for Arabic). Words, meanings, answers and the study text are lesson content and are not translated. Your choice is saved, and switching language never changes your progress, a running quiz or your other settings. The language button is hidden while a quiz is running.
 
 **Font style**
 
@@ -304,10 +315,15 @@ The choice is saved and applies to every screen at once. English letters in Regu
 
 The **Info** tab has these parts, in this order:
 
+- **About e.english**: the app **version**, what is new in this version, and a short description of the site.
 - **Study method** (first): a suggested way to study with the app, written by the owner of the site in his own words (Egyptian Arabic). It talks about paper and three pens, starting with a few words, splitting long words into parts, resting for a short time, testing yourself on an empty sheet, marking mistakes with a highlighter and the **Review** button, taking a quiz, and reviewing by hiding the Arabic and then the English. A few key phrases are highlighted so the eye catches them. A split word such as indivi + duals shows each part in its own chip. Pen colors named in the text (red, black, blue) are shown as colored ink, not as highlighter chips.
 - A small **legend** of highlighter colors (Yellow, Green, Purple, Pink), shown as small rounded rectangles like real highlighters, and a note: do not use the same or similar colors for different ideas, because the brain can mix them up. For example, if you use the red pen for hard words, do not use a red highlighter for them.
 - **Parts of speech**: what each tag means, with its color.
 - A small footer with the credit and the copyright.
+
+## Feedback
+
+The **Feedback** tab lets you contact the developer to report a bug, suggest an improvement, share an opinion or send any other feedback. It explains how to describe a problem (the affected feature, the steps to repeat it, what you expected and what happened, and your device and browser). The **Contact me on WhatsApp** button opens a WhatsApp chat with the developer (username `@Ma7mee7o`). The website itself does not send, collect or store any message.
 
 ## Automatic updates
 
@@ -316,7 +332,7 @@ The **Info** tab has these parts, in this order:
 | Number | Meaning |
 | --- | --- |
 | `EE_MODEL_VERSION` | The **app version** (a release of e.english). |
-| `EE_JS_VERSION` | The **JavaScript loading version**. Scripts are requested as `ux.js?js=2`, and the cache is named after both numbers, for example `e-english-v10-js2`. Changing it forces every script and cache to start fresh without a new app release. |
+| `EE_JS_VERSION` | The **JavaScript loading version**. Scripts are requested as `ux.js?js=2`, and the cache is named after both numbers, for example `e-english-v11-js2`. Changing it forces every script and cache to start fresh without a new app release. |
 
 When you open the app, it asks the server which versions are current. If either one is different from the one running, newer **or older**, the app refreshes itself once the new files have had a few seconds to arrive.
 
@@ -337,7 +353,7 @@ e.english is local-first.
 
 - There are no accounts and no tracking.
 - Your progress is never uploaded. It stays in your browser.
-- The app makes requests only to its own files. It does not load fonts, icons or scripts from other websites.
+- The app makes requests only to its own files. It does not load fonts, icons or scripts from other websites. The only link that leaves the app is the **Contact me on WhatsApp** button, and only when you tap it.
 - Deleting the browser's site data, or using **Delete All Data**, removes your progress for good unless you exported a backup.
 
 ## Import and export
@@ -379,20 +395,23 @@ index.html              App shell, metadata and navigation
 app.json                List of lesson files to load
 sw.js                   Service worker (offline cache)
 manifest.webmanifest    Install metadata
-README.md               This file, also shown in the app
+README.md               This file, also shown in the app (English)
+README.ar.md            The Arabic version of this file
 CSS/
-  root.css              Design tokens, themes, 8 accent palettes
+  root.css              Design tokens, themes, 6 accent palettes + neutral Default
   responsive.css        Layout and components
   settings.css          Settings screen
   animations.css        Motion
 JavaScript/
   version.js            App version + JavaScript loading version
   icons.js              Built-in icon set
+  i18n.js               English / Arabic translation (one dictionary)
   quiz-engine.js        Quiz logic: duration, scoring, answer checking
   ux.js                 State, storage, event bus, quiz and review glue
   ui.js                 Screens and rendering
   settings.js           Settings screen
   readme.js             README screen and Markdown renderer
+  pages.js              Feedback screen + version / changelog on Info
 Files/
   U02-L1-2.md ...       Lesson files
 Ui/

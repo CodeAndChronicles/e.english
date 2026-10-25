@@ -34,6 +34,7 @@
   <div id="app">
     <button id="theme-toggle-btn" class="theme-toggle-btn" aria-label="Theme">
     </button>
+    <button id="lang-toggle-btn" class="theme-toggle-btn lang-toggle-btn" type="button" aria-label="Language"></button>
     <nav id="side-nav" class="side-nav" hidden>
       <img src="Ui/Logo.png" alt="" class="side-nav-logo" />
       <button class="nav-btn" data-nav="home">
@@ -53,6 +54,9 @@
       </button>
       <button class="nav-btn" data-nav="readme">
         <span>README</span>
+      </button>
+      <button class="nav-btn" data-nav="feedback">
+        <span>Feedback</span>
       </button>
     </nav>
     <main id="screen-container"></main>
@@ -75,6 +79,9 @@
       <button class="nav-btn" data-nav="readme">
         <span>README</span>
       </button>
+      <button class="nav-btn" data-nav="feedback">
+        <span>Feedback</span>
+      </button>
     </nav>
   </div>
 
@@ -85,7 +92,7 @@
   <script>
     (function () {
       var q = '?js=' + (window.EE_JS_VERSION || '0');
-      var files = ['icons', 'quiz-engine', 'ux', 'ui', 'settings', 'readme'];   // order matters: quiz-engine before ux, ux before ui
+      var files = ['icons', 'i18n', 'quiz-engine', 'ux', 'ui', 'settings', 'readme', 'pages'];   // order matters: i18n before ux (ux applies the saved language), quiz-engine before ux, ux before ui
       var left = files.length;
       files.forEach(function (name) {
         var s = document.createElement('script');

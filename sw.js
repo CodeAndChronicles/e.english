@@ -12,17 +12,17 @@
    so user learning data is out of its reach by construction. */
 importScripts('JavaScript/version.js');
 
-const CACHE_NAME = self.EE_CACHE_NAME;       // e.g. "e-english-v10-js2" (app version 10 + JavaScript loading version 2)
+const CACHE_NAME = self.EE_CACHE_NAME;       // e.g. "e-english-v11-js2" (app version 11 + JavaScript loading version 2)
 const CACHE_PREFIX = self.EE_CACHE_PREFIX;   // "e-english-"
 
 // JavaScript files are requested as "<file>.js?js=<EE_JS_VERSION>" (index.html), so the
 // JavaScript loading version is part of the URL that is fetched and cached.
 const JSQ = '?js=' + self.EE_JS_VERSION;
 const SHELL = [
-  './', 'index.html', 'app.json', 'README.md', 'manifest.webmanifest',
+  './', 'index.html', 'app.json', 'README.md', 'README.ar.md', 'manifest.webmanifest',
   'CSS/root.css', 'CSS/responsive.css', 'CSS/animations.css', 'CSS/settings.css',
-  'JavaScript/version.js', 'JavaScript/icons.js' + JSQ, 'JavaScript/quiz-engine.js' + JSQ, 'JavaScript/ux.js' + JSQ,
-  'JavaScript/ui.js' + JSQ, 'JavaScript/settings.js' + JSQ, 'JavaScript/readme.js' + JSQ,
+  'JavaScript/version.js', 'JavaScript/icons.js' + JSQ, 'JavaScript/i18n.js' + JSQ, 'JavaScript/quiz-engine.js' + JSQ, 'JavaScript/ux.js' + JSQ,
+  'JavaScript/ui.js' + JSQ, 'JavaScript/settings.js' + JSQ, 'JavaScript/readme.js' + JSQ, 'JavaScript/pages.js' + JSQ,
   'Ui/Logo.png', 'Ui/Regular.ttf', 'Ui/Bold.ttf'
 ];
 
